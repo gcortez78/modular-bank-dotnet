@@ -14,7 +14,7 @@ public class AccountsService(AccountsDbContext db) : IAccountsService
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            AccountNumber = $"ACC{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            AccountNumber = "ACC" + Guid.NewGuid().ToString("N")[..12].ToUpper(),
             Balance = 0
         };
         db.Accounts.Add(account);
@@ -31,6 +31,9 @@ public class AccountsService(AccountsDbContext db) : IAccountsService
 
     public async Task DebitAsync(Guid accountId, Money amount, string? reference)
     {
+        if (!await db.Accounts.AnyAsync(a => a.Id == accountId))
+            throw new KeyNotFoundException("Account not found");
+
         var rows = await db.Accounts
             .Where(a => a.Id == accountId && a.Balance >= amount.Amount)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.Balance, a => a.Balance - amount.Amount));
@@ -41,9 +44,12 @@ public class AccountsService(AccountsDbContext db) : IAccountsService
 
     public async Task CreditAsync(Guid accountId, Money amount, string? reference)
     {
-        await db.Accounts
+        var rows = await db.Accounts
             .Where(a => a.Id == accountId)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.Balance, a => a.Balance + amount.Amount));
+
+        if (rows == 0)
+            throw new KeyNotFoundException("Account not found");
     }
 
     public async Task<List<AccountSummary>> FindByOwnerAsync(Guid userId)

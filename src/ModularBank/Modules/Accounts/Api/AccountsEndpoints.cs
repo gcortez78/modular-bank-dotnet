@@ -22,12 +22,18 @@ public static class AccountsEndpoints
             return Results.Created($"/accounts/{account.Id}", account);
         });
 
-        group.MapGet("/{id:guid}/balance", async (Guid id, IAccountsService service) =>
+        group.MapGet("/{id:guid}/balance", async (Guid id, ClaimsPrincipal user, IAccountsService service) =>
         {
+            if (!TryGetUserId(user, out var userId)) return Results.Unauthorized();
+
+            var owned = await service.FindByOwnerAsync(userId);
+            if (!owned.Any(a => a.Id == id))
+                return Results.Forbid();
+
             try
             {
                 var balance = await service.GetBalanceAsync(id);
-                return Results.Ok(new { amount = balance.Amount.ToString() });
+                return Results.Ok(new { amount = balance.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture) });
             }
             catch (KeyNotFoundException)
             {
