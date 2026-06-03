@@ -10,7 +10,7 @@ namespace ModularBank.Modules.Accounts.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-
+            migrationBuilder.EnsureSchema(name: "accounts");
         }
 
         /// <inheritdoc />

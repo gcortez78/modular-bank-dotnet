@@ -29,7 +29,8 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             e.ToTable("refresh_tokens");
             e.HasKey(x => x.Id);
             e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
-            e.Property(x => x.Token).IsRequired().HasMaxLength(255);
+            // TODO: store SHA-256(token) here instead of plaintext before production use
+            e.Property(x => x.Token).IsRequired(); // TEXT — no max length
             e.HasIndex(x => x.Token).IsUnique();
             e.Property(x => x.ExpiresAt).HasColumnName("expires_at").IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at")
