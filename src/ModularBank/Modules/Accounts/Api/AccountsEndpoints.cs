@@ -27,18 +27,11 @@ public static class AccountsEndpoints
             if (!TryGetUserId(user, out var userId)) return Results.Unauthorized();
 
             var owned = await service.FindByOwnerAsync(userId);
-            if (!owned.Any(a => a.Id == id))
+            var account = owned.FirstOrDefault(a => a.Id == id);
+            if (account is null)
                 return Results.Forbid();
 
-            try
-            {
-                var balance = await service.GetBalanceAsync(id);
-                return Results.Ok(new { amount = balance.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture) });
-            }
-            catch (KeyNotFoundException)
-            {
-                return Results.NotFound();
-            }
+            return Results.Ok(new { amount = account.Balance.ToString(System.Globalization.CultureInfo.InvariantCulture) });
         });
     }
 
