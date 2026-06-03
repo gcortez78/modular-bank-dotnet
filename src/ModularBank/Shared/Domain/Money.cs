@@ -13,6 +13,11 @@ public record Money
     public static Money Of(decimal amount) => new(amount);
 
     public Money Add(Money other) => new(Amount + other.Amount);
-    public Money Subtract(Money other) => new(Amount - other.Amount);
+    public Money Subtract(Money other)
+    {
+        if (other.Amount > Amount)
+            throw new InvalidOperationException($"Insufficient funds: cannot subtract {other.Amount} from {Amount}");
+        return new(Amount - other.Amount);
+    }
     public bool IsGreaterThanOrEqualTo(Money other) => Amount >= other.Amount;
 }

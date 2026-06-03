@@ -14,7 +14,9 @@ public class JwtUtil
     {
         _secret = configuration["Jwt:Secret"]
             ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
-        _accessExpirationMinutes = int.Parse(configuration["Jwt:AccessExpirationMinutes"]!);
+        var expStr = configuration["Jwt:AccessExpirationMinutes"]
+            ?? throw new InvalidOperationException("Jwt:AccessExpirationMinutes is not configured.");
+        _accessExpirationMinutes = int.Parse(expStr);
     }
 
     public string GenerateAccessToken(Guid userId)
