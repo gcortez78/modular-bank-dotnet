@@ -3,6 +3,7 @@ using ModularBank.Modules.Accounts.Infrastructure;
 using ModularBank.Modules.Transfers.Infrastructure;
 using ModularBank.Modules.Notifications.Infrastructure;
 using ModularBank.Modules.Audit.Infrastructure;
+using ModularBank.Shared.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -32,6 +33,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<JwtUtil>();
 
 builder.Services.AddAuthModule(connectionString);
 builder.Services.AddAccountsModule(connectionString);
