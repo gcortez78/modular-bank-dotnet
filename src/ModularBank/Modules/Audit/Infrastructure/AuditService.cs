@@ -8,6 +8,9 @@ public class AuditService(AuditDbContext db) : IAuditService
 {
     public async Task RecordAsync(Guid userId, string action, Dictionary<string, string> metadata)
     {
+        if (string.IsNullOrWhiteSpace(action) || action.Length > 100)
+            throw new ArgumentException("Action must be 1-100 characters.", nameof(action));
+
         db.AuditEntries.Add(new AuditEntry
         {
             Id = Guid.NewGuid(),

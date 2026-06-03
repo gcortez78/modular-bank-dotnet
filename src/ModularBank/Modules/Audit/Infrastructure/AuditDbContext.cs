@@ -15,6 +15,7 @@ public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContex
         {
             e.ToTable("audit_entries");
             e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
             e.Property(x => x.Action).HasColumnName("action").HasMaxLength(100).IsRequired();
             e.Property(x => x.Metadata)
@@ -23,6 +24,7 @@ public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContex
                 .IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at")
                 .ValueGeneratedOnAdd().HasDefaultValueSql("now()");
+            e.HasIndex(x => x.UserId).HasDatabaseName("ix_audit_entries_user_id");
         });
     }
 }
