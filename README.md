@@ -13,15 +13,7 @@ docker-compose up -d
 dotnet run --project src/ModularBank/
 ```
 
-## Aplicar migraciones (primera vez)
-
-```bash
-dotnet ef database update --context AuthDbContext --project src/ModularBank/
-dotnet ef database update --context AccountsDbContext --project src/ModularBank/
-dotnet ef database update --context TransfersDbContext --project src/ModularBank/
-dotnet ef database update --context NotificationsDbContext --project src/ModularBank/
-dotnet ef database update --context AuditDbContext --project src/ModularBank/
-```
+Las migraciones de EF Core se aplican automáticamente al iniciar la aplicación.
 
 ## Módulos
 
@@ -35,15 +27,91 @@ dotnet ef database update --context AuditDbContext --project src/ModularBank/
 
 ## Arquitectura
 
-Cada módulo tiene su propio `DbContext` apuntando a su schema.
-Los módulos se comunican únicamente a través de interfaces en `Application/`.
-Ningún módulo referencia el `DbContext` de otro módulo.
+### Dependencias entre módulos
 
-## Migración a microservicios
+```mermaid
+graph TD
+    Client([Cliente HTTP])
 
-Ver `README-migration.md` en cada módulo. Orden recomendado:
-1. Notifications
-2. Audit
-3. Auth
-4. Accounts
-5. Transfers
+    Client --> AuthAPI[POST /auth/**]
+    Client --> AccAPI["GET, POST /accounts/**"]
+    Client --> TrAPI["POST, GET /transfers"]
+    Client --> NotifAPI[GET /notifications]
+    Client --> AuditAPI[GET /audit]
+
+    subgraph Auth
+        AuthAPI --> AuthUseCase
+        AuthUseCase --> AuthDB[(auth.*)]
+    end
+
+    subgraph Accounts
+        AccAPI --> AccountsUseCase
+        AccountsUseCase --> IAccountsService
+        IAccountsService --> AccountsDB[(accounts.*)]
+    end
+
+    subgraph Transfers
+        TrAPI --> TransferUseCase
+        TransferUseCase -->|IAccountsService| IAccountsService
+        TransferUseCase -->|INotificationsService| INotificationsService
+        TransferUseCase -->|IAuditService| IAuditService
+        TransferUseCase --> TransfersDB[(transfers.*)]
+    end
+
+    subgraph Notifications
+        NotifAPI --> INotificationsService
+        INotificationsService --> NotifDB[(notifications.*)]
+    end
+
+    subgraph Audit
+        AuditAPI --> IAuditService
+        IAuditService --> AuditDB[(audit.*)]
+    end
+```
+
+### Capas internas de cada módulo
+
+```mermaid
+graph LR
+    subgraph módulo
+        API["Api/\n(Endpoint)"]
+        APP["Application/\n(UseCase + Interface)"]
+        INFRA["Infrastructure/\n(Service + DbContext)"]
+        DOMAIN["Domain/\n(Entity)"]
+    end
+
+    API --> APP
+    APP --> DOMAIN
+    INFRA --> APP
+    INFRA --> DOMAIN
+
+    subgraph "otros módulos"
+        EXT["Application/\n(Interface pública)"]
+    end
+
+    APP -.->|"solo a través\nde interfaces"| EXT
+```
+
+### Aislamiento de schemas en PostgreSQL
+
+```mermaid
+graph TD
+    subgraph PostgreSQL
+        subgraph auth
+            users[(users)]
+            refresh_tokens[(refresh_tokens)]
+        end
+        subgraph accounts
+            accounts_t[(accounts)]
+        end
+        subgraph transfers
+            transfers_t[(transfers)]
+        end
+        subgraph notifications
+            notifications_t[(notifications)]
+        end
+        subgraph audit
+            audit_entries[(audit_entries)]
+        end
+    end
+```
