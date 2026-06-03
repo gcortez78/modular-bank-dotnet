@@ -16,9 +16,9 @@ public static class AuthEndpoints
                 var response = await useCase.RegisterAsync(request);
                 return Results.Created("/auth/me", response);
             }
-            catch (InvalidOperationException ex)
+            catch (InvalidOperationException)
             {
-                return Results.Conflict(new { message = ex.Message });
+                return Results.Conflict(new { message = "Registration could not be completed" });
             }
         });
 
@@ -35,11 +35,11 @@ public static class AuthEndpoints
             }
         });
 
-        group.MapPost("/refresh", async (string refreshToken, AuthUseCase useCase) =>
+        group.MapPost("/refresh", async (RefreshRequest request, AuthUseCase useCase) =>
         {
             try
             {
-                var response = await useCase.RefreshAsync(refreshToken);
+                var response = await useCase.RefreshAsync(request.Token);
                 return Results.Ok(response);
             }
             catch (UnauthorizedAccessException)

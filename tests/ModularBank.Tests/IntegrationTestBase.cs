@@ -31,6 +31,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
             {
                 builder.UseSetting("ConnectionStrings:Default", _postgres.GetConnectionString());
                 builder.UseSetting("Jwt:Secret", "test-secret-for-integration-tests-min-32chars!!");
+                builder.UseSetting("Jwt:AccessExpirationMinutes", "15");
+                builder.UseSetting("Jwt:RefreshExpirationDays", "7");
             });
 
         Client = _factory.CreateClient();

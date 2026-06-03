@@ -40,9 +40,13 @@ public class AuthUseCase(AuthDbContext db, JwtUtil jwtUtil, IConfiguration confi
         return await BuildAuthResponseAsync(user.Id);
     }
 
+    private static string HashToken(string raw) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(raw)));
+
     public async Task<AuthResponse> RefreshAsync(string rawToken)
     {
-        var token = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Token == rawToken)
+        var token = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Token == HashToken(rawToken))
             ?? throw new UnauthorizedAccessException("Invalid refresh token");
 
         if (token.ExpiresAt < DateTime.UtcNow)
@@ -67,7 +71,7 @@ public class AuthUseCase(AuthDbContext db, JwtUtil jwtUtil, IConfiguration confi
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            Token = rawRefreshToken,
+            Token = HashToken(rawRefreshToken),   // store hash
             ExpiresAt = DateTime.UtcNow.AddDays(_refreshExpirationDays)
         });
         await db.SaveChangesAsync();
