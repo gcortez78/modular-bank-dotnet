@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ModularBank.Modules.Auth.Application;
 
 namespace ModularBank.Modules.Auth.Infrastructure;
 
@@ -9,7 +10,7 @@ public static class AuthModuleExtensions
     {
         services.AddDbContext<AuthDbContext>(opt =>
             opt.UseNpgsql(connectionString));
-        services.AddScoped<ModularBank.Modules.Auth.Application.AuthUseCase>();
+        services.AddScoped<AuthUseCase>();
         return services;
     }
 }
