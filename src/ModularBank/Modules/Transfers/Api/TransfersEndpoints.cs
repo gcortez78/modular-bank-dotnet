@@ -1,4 +1,3 @@
-using ModularBank.Modules.Accounts.Application;
 using ModularBank.Modules.Transfers.Application;
 using ModularBank.Modules.Transfers.Application.Dto;
 using System.Security.Claims;
@@ -36,17 +35,23 @@ public static class TransfersEndpoints
             }
         });
 
-        group.MapGet("", async (Guid accountId, ClaimsPrincipal user, TransferUseCase useCase, IAccountsService accountsService) =>
+        group.MapGet("", async (Guid accountId, ClaimsPrincipal user, TransferUseCase useCase) =>
         {
             var raw = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue("sub");
             if (raw is null || !Guid.TryParse(raw, out var userId))
                 return Results.Unauthorized();
-
-            var owned = await accountsService.FindByOwnerAsync(userId);
-            if (!owned.Any(a => a.Id == accountId))
+            try
+            {
+                return Results.Ok(await useCase.GetHistoryAsync(userId, accountId));
+            }
+            catch (UnauthorizedAccessException)
+            {
                 return Results.Forbid();
-
-            return Results.Ok(await useCase.GetHistoryAsync(accountId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
         });
     }
 }

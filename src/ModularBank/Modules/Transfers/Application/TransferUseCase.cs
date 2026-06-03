@@ -37,7 +37,8 @@ public class TransferUseCase(
             SourceAccountId = request.SourceAccountId,
             TargetAccountId = request.TargetAccountId,
             Amount = request.Amount,
-            Reference = request.Reference
+            Reference = request.Reference,
+            CreatedAt = DateTime.UtcNow
         };
         db.Transfers.Add(transfer);
         await db.SaveChangesAsync();
@@ -57,8 +58,12 @@ public class TransferUseCase(
         return transfer;
     }
 
-    public async Task<List<Transfer>> GetHistoryAsync(Guid accountId)
+    public async Task<List<Transfer>> GetHistoryAsync(Guid userId, Guid accountId)
     {
+        var owned = await accountsService.FindByOwnerAsync(userId);
+        if (!owned.Any(a => a.Id == accountId))
+            throw new UnauthorizedAccessException("Account does not belong to the authenticated user.");
+
         return await db.Transfers
             .Where(t => t.SourceAccountId == accountId || t.TargetAccountId == accountId)
             .OrderByDescending(t => t.CreatedAt)

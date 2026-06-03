@@ -37,4 +37,35 @@ public class TransferIntegrationTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
+
+    [Fact]
+    public async Task TransferFromAnotherUsersAccountReturns403()
+    {
+        var (tokenA, accountAId) = await SetupUserWithAccount("alice3@example.com");
+        var (tokenB, accountBId) = await SetupUserWithAccount("bob3@example.com");
+
+        // Bob tries to transfer FROM Alice's account
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenB);
+        var response = await Client.PostAsJsonAsync("/transfers", new
+        {
+            sourceAccountId = accountAId,  // Alice's account
+            targetAccountId = accountBId,
+            amount = 1.00m
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TransferHistoryForAnotherUsersAccountReturns403()
+    {
+        var (tokenA, accountAId) = await SetupUserWithAccount("alice4@example.com");
+        var (tokenB, _) = await SetupUserWithAccount("bob4@example.com");
+
+        // Bob tries to read Alice's account history
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenB);
+        var response = await Client.GetAsync($"/transfers?accountId={accountAId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }
