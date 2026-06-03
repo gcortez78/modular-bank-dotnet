@@ -22,6 +22,10 @@ public class TransferUseCase(
     // Production systems should use a Saga or outbox pattern for full atomicity.
     public async Task<Transfer> ExecuteAsync(Guid userId, TransferRequest request)
     {
+        var owned = await accountsService.FindByOwnerAsync(userId);
+        if (!owned.Any(a => a.Id == request.SourceAccountId))
+            throw new UnauthorizedAccessException("Source account does not belong to the authenticated user.");
+
         var amount = Money.Of(request.Amount);
 
         await accountsService.DebitAsync(request.SourceAccountId, amount, request.Reference);
