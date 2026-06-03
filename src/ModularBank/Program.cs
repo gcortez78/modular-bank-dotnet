@@ -4,6 +4,7 @@ using ModularBank.Modules.Notifications.Api;
 using ModularBank.Modules.Accounts.Infrastructure;
 using ModularBank.Modules.Accounts.Api;
 using ModularBank.Modules.Transfers.Infrastructure;
+using ModularBank.Modules.Transfers.Api;
 using ModularBank.Modules.Notifications.Infrastructure;
 using ModularBank.Modules.Audit.Infrastructure;
 using ModularBank.Modules.Audit.Api;
@@ -53,6 +54,7 @@ app.UseAuthorization();
 app.MapGet("/health", () => "ok");
 app.MapAuthEndpoints();
 app.MapAccountsEndpoints();
+app.MapTransfersEndpoints();
 app.MapNotificationsEndpoints();
 app.MapAuditEndpoints();
 
