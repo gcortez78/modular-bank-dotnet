@@ -14,7 +14,7 @@ IAccountsService.FindByOwnerAsync(Guid userId) → List<AccountSummary>
 
 ## To extract as microservice
 1. Create `accounts-service` with the same DB schema
-2. Replace `AccountsService` with `AccountsHttpClient`:
+2. Replace the `IAccountsService` DI registration with `AccountsHttpClient : IAccountsService`:
    - GET  /internal/accounts/{id}/balance
    - POST /internal/accounts/{id}/debit  { amount, reference }
    - POST /internal/accounts/{id}/credit { amount, reference }
