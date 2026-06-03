@@ -1,7 +1,5 @@
-using Microsoft.AspNetCore.Mvc;
-using ModularBank.Modules.Notifications.Infrastructure;
+using ModularBank.Modules.Notifications.Application;
 using System.Security.Claims;
-using Microsoft.EntityFrameworkCore;
 
 namespace ModularBank.Modules.Notifications.Api;
 
@@ -9,14 +7,14 @@ public static class NotificationsEndpoints
 {
     public static void MapNotificationsEndpoints(this WebApplication app)
     {
-        app.MapGet("/notifications", async (ClaimsPrincipal user, NotificationsDbContext db) =>
+        app.MapGet("/notifications", async (ClaimsPrincipal user, INotificationsService notificationsService) =>
         {
-            var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? user.FindFirstValue("sub")!);
-            var notifications = await db.Notifications
-                .Where(n => n.UserId == userId)
-                .OrderByDescending(n => n.CreatedAt)
-                .ToListAsync();
+            var raw = user.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? user.FindFirstValue("sub");
+            if (raw is null || !Guid.TryParse(raw, out var userId))
+                return Results.Unauthorized();
+
+            var notifications = await notificationsService.GetForUserAsync(userId);
             return Results.Ok(notifications);
         }).RequireAuthorization();
     }

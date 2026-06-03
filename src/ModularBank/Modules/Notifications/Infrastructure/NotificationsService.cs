@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using ModularBank.Modules.Notifications.Application;
 using ModularBank.Modules.Notifications.Domain;
 
@@ -15,5 +16,13 @@ public class NotificationsService(NotificationsDbContext db) : INotificationsSer
             Payload = payload
         });
         await db.SaveChangesAsync();
+    }
+
+    public async Task<List<Notification>> GetForUserAsync(Guid userId)
+    {
+        return await db.Notifications
+            .Where(n => n.UserId == userId)
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync();
     }
 }
