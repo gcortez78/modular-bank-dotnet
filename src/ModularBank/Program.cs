@@ -10,6 +10,7 @@ using ModularBank.Modules.Audit.Infrastructure;
 using ModularBank.Modules.Audit.Api;
 using ModularBank.Shared.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -47,6 +48,20 @@ builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddAuditModule(connectionString);
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var contexts = new DbContext[]
+    {
+        scope.ServiceProvider.GetRequiredService<AuthDbContext>(),
+        scope.ServiceProvider.GetRequiredService<AccountsDbContext>(),
+        scope.ServiceProvider.GetRequiredService<TransfersDbContext>(),
+        scope.ServiceProvider.GetRequiredService<NotificationsDbContext>(),
+        scope.ServiceProvider.GetRequiredService<AuditDbContext>()
+    };
+    foreach (var ctx in contexts)
+        ctx.Database.Migrate();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

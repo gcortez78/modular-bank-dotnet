@@ -10,7 +10,9 @@ using Testcontainers.PostgreSql;
 
 namespace ModularBank.Tests;
 
-public abstract class IntegrationTestBase : IAsyncLifetime
+// Singleton container pattern: one Postgres container for the entire test suite JVM lifetime.
+// Prevents port-reuse timing issues with Colima's Docker NAT when spinning up per-test containers.
+public sealed class SharedPostgresContainer : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithDatabase("modular_bank")
@@ -19,17 +21,35 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         .WithImage("postgres:16")
         .Build();
 
-    protected HttpClient Client { get; private set; } = null!;
+    public string ConnectionString => _postgres.GetConnectionString();
+
+    public async Task InitializeAsync() => await _postgres.StartAsync();
+    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+}
+
+[CollectionDefinition("IntegrationTests")]
+public class IntegrationTestCollection : ICollectionFixture<SharedPostgresContainer> { }
+
+[Collection("IntegrationTests")]
+public abstract class IntegrationTestBase : IAsyncLifetime
+{
+    private readonly SharedPostgresContainer _sharedDb;
     private WebApplicationFactory<Program>? _factory;
+
+    protected HttpClient Client { get; private set; } = null!;
+    protected WebApplicationFactory<Program> Factory => _factory!;
+
+    protected IntegrationTestBase(SharedPostgresContainer sharedDb)
+    {
+        _sharedDb = sharedDb;
+    }
 
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
-
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:Default", _postgres.GetConnectionString());
+                builder.UseSetting("ConnectionStrings:Default", _sharedDb.ConnectionString);
                 builder.UseSetting("Jwt:Secret", "test-secret-for-integration-tests-min-32chars!!");
                 builder.UseSetting("Jwt:AccessExpirationMinutes", "15");
                 builder.UseSetting("Jwt:RefreshExpirationDays", "7");
@@ -53,6 +73,5 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     public async Task DisposeAsync()
     {
         if (_factory != null) await _factory.DisposeAsync();
-        await _postgres.DisposeAsync();
     }
 }

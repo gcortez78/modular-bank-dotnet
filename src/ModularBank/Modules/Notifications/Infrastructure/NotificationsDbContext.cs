@@ -15,6 +15,7 @@ public class NotificationsDbContext(DbContextOptions<NotificationsDbContext> opt
         {
             e.ToTable("notifications");
             e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
             e.Property(x => x.Type)
                 .HasColumnName("type")

@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.DependencyInjection;
+using ModularBank.Modules.Accounts.Infrastructure;
 
 namespace ModularBank.Tests.Transfers;
 
-public class TransferIntegrationTests : IntegrationTestBase
+public class TransferIntegrationTests(SharedPostgresContainer db) : IntegrationTestBase(db)
 {
     private async Task<(string token, Guid accountId)> SetupUserWithAccount(string email)
     {
@@ -62,10 +64,85 @@ public class TransferIntegrationTests : IntegrationTestBase
         var (tokenA, accountAId) = await SetupUserWithAccount("alice4@example.com");
         var (tokenB, _) = await SetupUserWithAccount("bob4@example.com");
 
-        // Bob tries to read Alice's account history
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenB);
         var response = await Client.GetAsync($"/transfers?accountId={accountAId}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    private async Task FundAccount(Guid accountId, decimal amount)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AccountsDbContext>();
+        var account = await db.Accounts.FindAsync(accountId);
+        account!.Balance = amount;
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task SuccessfulTransferCreatesHistoryEntry()
+    {
+        var (tokenA, accountAId) = await SetupUserWithAccount("alice5@example.com");
+        var (_, accountBId) = await SetupUserWithAccount("bob5@example.com");
+        await FundAccount(accountAId, 1000m);
+
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenA);
+        var transferResp = await Client.PostAsJsonAsync("/transfers", new
+        {
+            sourceAccountId = accountAId,
+            targetAccountId = accountBId,
+            amount = 250.00m,
+            reference = "test-payment"
+        });
+        Assert.Equal(HttpStatusCode.Created, transferResp.StatusCode);
+        var transfer = await transferResp.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        Assert.NotNull(transfer!["id"]);
+
+        var historyResp = await Client.GetAsync($"/transfers?accountId={accountAId}");
+        Assert.Equal(HttpStatusCode.OK, historyResp.StatusCode);
+        var history = await historyResp.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+        Assert.Single(history!);
+    }
+
+    [Fact]
+    public async Task AuditRecordsTransferEvent()
+    {
+        var (tokenA, accountAId) = await SetupUserWithAccount("alice6@example.com");
+        var (_, accountBId) = await SetupUserWithAccount("bob6@example.com");
+        await FundAccount(accountAId, 500m);
+
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenA);
+        await Client.PostAsJsonAsync("/transfers", new
+        {
+            sourceAccountId = accountAId,
+            targetAccountId = accountBId,
+            amount = 50.00m
+        });
+
+        var auditResp = await Client.GetAsync("/audit");
+        Assert.Equal(HttpStatusCode.OK, auditResp.StatusCode);
+        var audit = await auditResp.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+        Assert.NotEmpty(audit!);
+    }
+
+    [Fact]
+    public async Task NotificationsRecordTransferEvent()
+    {
+        var (tokenA, accountAId) = await SetupUserWithAccount("alice7@example.com");
+        var (_, accountBId) = await SetupUserWithAccount("bob7@example.com");
+        await FundAccount(accountAId, 500m);
+
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenA);
+        await Client.PostAsJsonAsync("/transfers", new
+        {
+            sourceAccountId = accountAId,
+            targetAccountId = accountBId,
+            amount = 75.00m
+        });
+
+        var notifResp = await Client.GetAsync("/notifications");
+        Assert.Equal(HttpStatusCode.OK, notifResp.StatusCode);
+        var notifications = await notifResp.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+        Assert.NotEmpty(notifications!);
     }
 }

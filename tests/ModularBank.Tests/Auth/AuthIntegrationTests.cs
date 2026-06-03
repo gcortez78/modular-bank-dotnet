@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 
 namespace ModularBank.Tests.Auth;
 
-public class AuthIntegrationTests : IntegrationTestBase
+public class AuthIntegrationTests(SharedPostgresContainer db) : IntegrationTestBase(db)
 {
     [Fact]
     public async Task RegisterAndLoginSuccessfully()
@@ -41,5 +41,29 @@ public class AuthIntegrationTests : IntegrationTestBase
         });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RefreshTokenReturnsNewAccessToken()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var email = $"refresh-{suffix}@example.com";
+
+        await Client.PostAsJsonAsync("/auth/register",
+            new { email, password = "Password123!", name = "Refresh User" });
+        var loginResp = await Client.PostAsJsonAsync("/auth/login",
+            new { email, password = "Password123!" });
+        var loginBody = await loginResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        var refreshToken = loginBody!["refreshToken"];
+
+        var refreshResp = await Client.PostAsJsonAsync("/auth/refresh",
+            new { refreshToken });
+        Assert.Equal(HttpStatusCode.OK, refreshResp.StatusCode);
+
+        var body = await refreshResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        Assert.NotNull(body!["accessToken"]);
+        Assert.NotNull(body["refreshToken"]);
+        // Token is rotated
+        Assert.NotEqual(refreshToken, body["refreshToken"]);
     }
 }
