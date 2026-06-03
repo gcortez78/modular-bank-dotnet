@@ -5,6 +5,7 @@ using ModularBank.Modules.Accounts.Infrastructure;
 using ModularBank.Modules.Transfers.Infrastructure;
 using ModularBank.Modules.Notifications.Infrastructure;
 using ModularBank.Modules.Audit.Infrastructure;
+using ModularBank.Modules.Audit.Api;
 using ModularBank.Shared.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -51,6 +52,7 @@ app.UseAuthorization();
 app.MapGet("/health", () => "ok");
 app.MapAuthEndpoints();
 app.MapNotificationsEndpoints();
+app.MapAuditEndpoints();
 
 app.Run();
 
