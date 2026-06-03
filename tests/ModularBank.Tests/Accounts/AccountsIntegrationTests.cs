@@ -32,6 +32,6 @@ public class AccountsIntegrationTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, balanceResp.StatusCode);
 
         var balance = await balanceResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
-        Assert.Equal("0", balance!["amount"]);
+        Assert.Equal("0.0000", balance!["amount"]);
     }
 }
