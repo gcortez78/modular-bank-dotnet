@@ -1,0 +1,167 @@
+name: plataforma-base-finbank
+
+services:
+  postgres-monolith:
+    image: postgres:16-alpine
+    container_name: finbank-postgres-monolith
+    environment:
+      POSTGRES_DB: "${MONOLITH_DB:-modular_bank}"
+      POSTGRES_USER: "${MONOLITH_DB_USER:-bank}"
+      POSTGRES_PASSWORD: "${MONOLITH_DB_PASSWORD:-bank-local}"
+    ports:
+      - "127.0.0.1:${MONOLITH_DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_monolith_data:/var/lib/postgresql/data
+    networks:
+      - data-monolith
+      - host-access
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.3.2-management-alpine
+    container_name: finbank-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-finbank}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:-finbank-local}"
+    ports:
+      - "127.0.0.1:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
+      - "127.0.0.1:${RABBITMQ_METRICS_PORT:-15692}:15692"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    networks:
+      - backend
+      - host-access
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 25s
+    restart: unless-stopped
+
+  monolith:
+    image: plataforma-base-finbank-monolith:1.0
+    build:
+      context: .
+      dockerfile: src/ModularBank/Dockerfile
+    container_name: finbank-monolith
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: "Host=postgres-monolith;Port=5432;Database=${MONOLITH_DB:-modular_bank};Username=${MONOLITH_DB_USER:-bank};Password=${MONOLITH_DB_PASSWORD:-bank-local}"
+      Jwt__Secret: "${JWT_SECRET}"
+      Jwt__AccessExpirationMinutes: "15"
+      Jwt__RefreshExpirationDays: "7"
+    expose:
+      - "8080"
+    depends_on:
+      postgres-monolith:
+        condition: service_healthy
+    networks:
+      - backend
+      - data-monolith
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+    restart: unless-stopped
+
+  gateway:
+    image: plataforma-base-finbank-gateway:1.0
+    build:
+      context: .
+      dockerfile: src/Gateway/Dockerfile
+    container_name: finbank-gateway
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      monolith:
+        condition: service_healthy
+    networks:
+      - edge
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  postgres-notifications:
+    profiles: ["future"]
+    image: postgres:16-alpine
+    container_name: finbank-postgres-notifications
+    environment:
+      POSTGRES_DB: "${NOTIFICATIONS_DB:-notifications_db}"
+      POSTGRES_USER: "${NOTIFICATIONS_DB_USER:-notifications}"
+      POSTGRES_PASSWORD: "${NOTIFICATIONS_DB_PASSWORD:-notifications-local}"
+    ports:
+      - "127.0.0.1:${NOTIFICATIONS_DB_PORT:-5434}:5432"
+    volumes:
+      - postgres_notifications_data:/var/lib/postgresql/data
+    networks:
+      - data-notifications
+      - host-access
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  postgres-transfers:
+    profiles: ["future"]
+    image: postgres:16-alpine
+    container_name: finbank-postgres-transfers
+    environment:
+      POSTGRES_DB: "${TRANSFERS_DB:-transfers_db}"
+      POSTGRES_USER: "${TRANSFERS_DB_USER:-transfers}"
+      POSTGRES_PASSWORD: "${TRANSFERS_DB_PASSWORD:-transfers-local}"
+    ports:
+      - "127.0.0.1:${TRANSFERS_DB_PORT:-5435}:5432"
+    volumes:
+      - postgres_transfers_data:/var/lib/postgresql/data
+    networks:
+      - data-transfers
+      - host-access
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+networks:
+  edge:
+  host-access:
+    driver: bridge
+  backend:
+    internal: true
+  data-monolith:
+    internal: true
+  data-notifications:
+    internal: true
+  data-transfers:
+    internal: true
+
+volumes:
+  postgres_monolith_data:
+  postgres_notifications_data:
+  postgres_transfers_data:
+  rabbitmq_data:

@@ -2,3 +2,8 @@ bin/
 obj/
 .env
 *.user
+*.suo
+*.log
+.vs/
+.vscode/
+TestResults/
