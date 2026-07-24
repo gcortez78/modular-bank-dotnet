@@ -23,6 +23,28 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  postgres-notifications:
+    image: postgres:16-alpine
+    container_name: finbank-postgres-notifications
+    environment:
+      POSTGRES_DB: "${NOTIFICATIONS_DB:-notifications_db}"
+      POSTGRES_USER: "${NOTIFICATIONS_DB_USER:-notifications}"
+      POSTGRES_PASSWORD: "${NOTIFICATIONS_DB_PASSWORD:-notifications-local}"
+    ports:
+      - "127.0.0.1:${NOTIFICATIONS_DB_PORT:-5434}:5432"
+    volumes:
+      - postgres_notifications_data:/var/lib/postgresql/data
+    networks:
+      - data-notifications
+      - host-access
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
   rabbitmq:
     image: rabbitmq:4.3.2-management-alpine
     container_name: finbank-rabbitmq
@@ -47,6 +69,34 @@ services:
       start_period: 25s
     restart: unless-stopped
 
+  notifications-service:
+    image: plataforma-base-finbank-notifications:1.0
+    build:
+      context: .
+      dockerfile: src/NotificationsService/Dockerfile
+    container_name: finbank-notifications-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: "Host=postgres-notifications;Port=5432;Database=${NOTIFICATIONS_DB:-notifications_db};Username=${NOTIFICATIONS_DB_USER:-notifications};Password=${NOTIFICATIONS_DB_PASSWORD:-notifications-local}"
+      Jwt__Secret: "${JWT_SECRET}"
+      InternalApiKey: "${NOTIFICATIONS_INTERNAL_API_KEY}"
+    expose:
+      - "8080"
+    depends_on:
+      postgres-notifications:
+        condition: service_healthy
+    networks:
+      - backend
+      - data-notifications
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 35s
+    restart: unless-stopped
+
   monolith:
     image: plataforma-base-finbank-monolith:1.0
     build:
@@ -60,6 +110,8 @@ services:
       Jwt__Secret: "${JWT_SECRET}"
       Jwt__AccessExpirationMinutes: "15"
       Jwt__RefreshExpirationDays: "7"
+      Notifications__BaseUrl: "http://notifications-service:8080/"
+      Notifications__InternalApiKey: "${NOTIFICATIONS_INTERNAL_API_KEY}"
     expose:
       - "8080"
     depends_on:
@@ -99,29 +151,6 @@ services:
       timeout: 5s
       retries: 20
       start_period: 20s
-    restart: unless-stopped
-
-  postgres-notifications:
-    profiles: ["future"]
-    image: postgres:16-alpine
-    container_name: finbank-postgres-notifications
-    environment:
-      POSTGRES_DB: "${NOTIFICATIONS_DB:-notifications_db}"
-      POSTGRES_USER: "${NOTIFICATIONS_DB_USER:-notifications}"
-      POSTGRES_PASSWORD: "${NOTIFICATIONS_DB_PASSWORD:-notifications-local}"
-    ports:
-      - "127.0.0.1:${NOTIFICATIONS_DB_PORT:-5434}:5432"
-    volumes:
-      - postgres_notifications_data:/var/lib/postgresql/data
-    networks:
-      - data-notifications
-      - host-access
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
     restart: unless-stopped
 
   postgres-transfers:
