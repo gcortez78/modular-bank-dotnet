@@ -1,10 +1,11 @@
-﻿using System.Text;
+using System.Text;
 using FinBank.NotificationsService.Api;
 using FinBank.NotificationsService.Application;
 using FinBank.NotificationsService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,13 +48,13 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-/*
- * El payload se almacena como texto JSON sobre una columna PostgreSQL jsonb.
- * Esta estrategia evita depender del mapeo dinámico de POCOs de Npgsql y
- * mantiene el esquema físico de la base de datos sin cambios.
- */
+var dataSource = new NpgsqlDataSourceBuilder(connectionString)
+    .EnableDynamicJson()
+    .Build();
+
+builder.Services.AddSingleton(dataSource);
 builder.Services.AddDbContext<NotificationsDbContext>(
-    options => options.UseNpgsql(connectionString));
+    options => options.UseNpgsql(dataSource));
 
 builder.Services.AddScoped<INotificationsService, PostgresNotificationsService>();
 builder.Services.AddScoped<InternalApiKeyFilter>();

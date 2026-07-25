@@ -1,0 +1,5 @@
+﻿               MigrationId                | ProductVersion 
+------------------------------------------+----------------
+ 202607240001_InitialNotificationsService | 10.0.4
+(1 row)
+

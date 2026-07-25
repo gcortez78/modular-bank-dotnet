@@ -9,3 +9,7 @@ obj/
 TestResults/
 .adr001-backup/
 .adr001-last-backup
+
+# Respaldos locales de base de datos
+notifications-data-backup.sql
+*-data-backup.sql

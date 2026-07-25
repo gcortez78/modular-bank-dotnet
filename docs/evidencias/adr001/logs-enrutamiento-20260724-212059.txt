@@ -1,0 +1,158 @@
+﻿finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-gateway                | info: Yarp.ReverseProxy.Forwarder.HttpForwarder[9]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-gateway                |       Proxying to http://notifications-service:8080/notifications HTTP/2 RequestVersionOrLower 
+finbank-gateway                | info: Yarp.ReverseProxy.Forwarder.HttpForwarder[56]
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-gateway                |       Received HTTP/1.1 response 401.
+finbank-gateway                | info: Yarp.ReverseProxy.Forwarder.HttpForwarder[9]
+finbank-gateway                |       Proxying to http://monolith:8080/accounts HTTP/2 RequestVersionOrLower 
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-gateway                | info: Yarp.ReverseProxy.Forwarder.HttpForwarder[56]
+finbank-gateway                |       Received HTTP/1.1 response 401.
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.4341ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.2925ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.3678ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.8403ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.3189ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-notifications-service  |       SELECT 1
+finbank-notifications-service  | info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+finbank-notifications-service  |       Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-notifications-service  |       SELECT 1
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.5566ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.3207ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.3669ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.4017ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.7998ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.2405ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://localhost:8080/health - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+finbank-monolith               |       Executing endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+finbank-monolith               |       Executed endpoint 'HTTP: GET /health'
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://localhost:8080/health - 200 - text/plain;+charset=utf-8 0.5246ms
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+finbank-monolith               |       Request starting HTTP/1.1 GET http://monolith:8080/accounts - - -
+finbank-monolith               | info: Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler[1]
+finbank-monolith               |       Failed to validate the token.
+finbank-monolith               |       Microsoft.IdentityModel.Tokens.SecurityTokenExpiredException: IDX10223: Lifetime validation failed. The token is expired. ValidTo (UTC): '07/25/2026 01:15:55', Current time (UTC): '07/25/2026 01:21:04'.
+finbank-monolith               |          at Microsoft.IdentityModel.Tokens.ValidatorUtilities.ValidateLifetime(Nullable`1 notBefore, Nullable`1 expires, SecurityToken securityToken, TokenValidationParameters validationParameters)
+finbank-monolith               |          at Microsoft.IdentityModel.Tokens.Validators.ValidateLifetime(Nullable`1 notBefore, Nullable`1 expires, SecurityToken securityToken, TokenValidationParameters validationParameters)
+finbank-monolith               |          at Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.ValidateTokenPayloadAsync(JsonWebToken jsonWebToken, TokenValidationParameters validationParameters, BaseConfiguration configuration)
+finbank-monolith               |          at Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.ValidateJWSAsync(JsonWebToken jsonWebToken, TokenValidationParameters validationParameters, BaseConfiguration configuration)
+finbank-monolith               | info: Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler[7]
+finbank-monolith               |       Bearer was not authenticated. Failure message: IDX10223: Lifetime validation failed. The token is expired. ValidTo (UTC): '07/25/2026 01:15:55', Current time (UTC): '07/25/2026 01:21:04'.
+finbank-monolith               | info: Microsoft.AspNetCore.Authorization.DefaultAuthorizationService[2]
+finbank-monolith               |       Authorization failed. These requirements were not met:
+finbank-monolith               |       DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+finbank-monolith               | info: Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler[12]
+finbank-monolith               |       AuthenticationScheme: Bearer was challenged.
+finbank-monolith               | info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+finbank-monolith               |       Request finished HTTP/1.1 GET http://monolith:8080/accounts - 401 0 - 64.0824ms

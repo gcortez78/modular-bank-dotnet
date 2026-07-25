@@ -1,4 +1,3 @@
-﻿using System.Text.Json;
 using FinBank.NotificationsService.Application;
 using FinBank.NotificationsService.Application.Contracts;
 using FinBank.NotificationsService.Domain;
@@ -10,9 +9,6 @@ public sealed class PostgresNotificationsService(
     NotificationsDbContext db,
     ILogger<PostgresNotificationsService> logger) : INotificationsService
 {
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
-
     public async Task<CreateNotificationResult> CreateAsync(
         CreateNotificationRequest request,
         CancellationToken cancellationToken)
@@ -21,15 +17,10 @@ public sealed class PostgresNotificationsService(
 
         if (idempotencyKey is not null)
         {
-            var existing = await FindByIdempotencyKeyAsync(
-                idempotencyKey,
-                cancellationToken);
-
+            var existing = await FindByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
             if (existing is not null)
             {
-                return new CreateNotificationResult(
-                    ToResponse(existing),
-                    Created: false);
+                return new CreateNotificationResult(ToResponse(existing), Created: false);
             }
         }
 
@@ -38,7 +29,9 @@ public sealed class PostgresNotificationsService(
             Id = Guid.NewGuid(),
             UserId = request.UserId,
             Type = request.Type,
-            PayloadJson = JsonSerializer.Serialize(request.Payload, JsonOptions),
+            Payload = new Dictionary<string, string>(
+                request.Payload,
+                StringComparer.Ordinal),
             IdempotencyKey = idempotencyKey,
             CreatedAt = DateTime.UtcNow
         };
@@ -51,12 +44,11 @@ public sealed class PostgresNotificationsService(
         }
         catch (DbUpdateException exception) when (idempotencyKey is not null)
         {
+            // Dos solicitudes concurrentes con la misma clave pueden competir.
+            // La restricción única decide cuál gana y la segunda recupera el registro existente.
             db.Entry(notification).State = EntityState.Detached;
 
-            var existing = await FindByIdempotencyKeyAsync(
-                idempotencyKey,
-                cancellationToken);
-
+            var existing = await FindByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
             if (existing is null)
             {
                 throw;
@@ -67,14 +59,10 @@ public sealed class PostgresNotificationsService(
                 "La notificación con clave de idempotencia {IdempotencyKey} ya existía.",
                 idempotencyKey);
 
-            return new CreateNotificationResult(
-                ToResponse(existing),
-                Created: false);
+            return new CreateNotificationResult(ToResponse(existing), Created: false);
         }
 
-        return new CreateNotificationResult(
-            ToResponse(notification),
-            Created: true);
+        return new CreateNotificationResult(ToResponse(notification), Created: true);
     }
 
     public async Task<IReadOnlyList<NotificationResponse>> GetForUserAsync(
@@ -111,26 +99,11 @@ public sealed class PostgresNotificationsService(
 
     private static NotificationResponse ToResponse(Notification notification)
     {
-        Dictionary<string, string> payload;
-
-        try
-        {
-            payload = JsonSerializer.Deserialize<Dictionary<string, string>>(
-                notification.PayloadJson,
-                JsonOptions) ?? new Dictionary<string, string>();
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException(
-                $"El payload JSON de la notificación {notification.Id} no es válido.",
-                exception);
-        }
-
         return new NotificationResponse(
             notification.Id,
             notification.UserId,
             notification.Type,
-            payload,
+            notification.Payload,
             notification.CreatedAt);
     }
 }

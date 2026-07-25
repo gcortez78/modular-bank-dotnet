@@ -1,4 +1,5 @@
-﻿using FinBank.NotificationsService.Infrastructure;
+using System.Collections.Generic;
+using FinBank.NotificationsService.Infrastructure;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -29,7 +30,7 @@ public partial class InitialNotificationsService : Migration
                 type = table.Column<int>(
                     type: "integer",
                     nullable: false),
-                payload = table.Column<string>(
+                payload = table.Column<Dictionary<string, string>>(
                     type: "jsonb",
                     nullable: false),
                 idempotency_key = table.Column<string>(

@@ -1,4 +1,5 @@
-﻿using FinBank.NotificationsService.Infrastructure;
+using System.Collections.Generic;
+using FinBank.NotificationsService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
@@ -32,7 +33,7 @@ partial class NotificationsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("character varying(100)")
                     .HasColumnName("idempotency_key");
 
-                entity.Property<string>("PayloadJson")
+                entity.Property<Dictionary<string, string>>("Payload")
                     .IsRequired()
                     .HasColumnType("jsonb")
                     .HasColumnName("payload");

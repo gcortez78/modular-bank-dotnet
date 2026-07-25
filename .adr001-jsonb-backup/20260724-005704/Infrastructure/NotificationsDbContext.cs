@@ -1,4 +1,4 @@
-﻿using FinBank.NotificationsService.Domain;
+using FinBank.NotificationsService.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinBank.NotificationsService.Infrastructure;
@@ -30,7 +30,7 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
                 .HasConversion<int>()
                 .IsRequired();
 
-            entity.Property(x => x.PayloadJson)
+            entity.Property(x => x.Payload)
                 .HasColumnName("payload")
                 .HasColumnType("jsonb")
                 .IsRequired();
