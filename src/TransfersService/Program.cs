@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,13 +11,15 @@ using TransfersService.Messaging;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
-    ?? throw new InvalidOperationException("No se configuró ConnectionStrings:Default.");
+    ?? throw new InvalidOperationException(
+        "No se configuró ConnectionStrings:Default.");
 
 var jwtSecret = builder.Configuration["Jwt:Secret"]
     ?? throw new InvalidOperationException("No se configuró Jwt:Secret.");
 
 if (Encoding.UTF8.GetByteCount(jwtSecret) < 32)
-    throw new InvalidOperationException("Jwt:Secret debe tener al menos 32 bytes.");
+    throw new InvalidOperationException(
+        "Jwt:Secret debe tener al menos 32 bytes.");
 
 builder.Services.AddDbContext<TransfersDbContext>(options =>
     options.UseNpgsql(
@@ -26,30 +28,15 @@ builder.Services.AddDbContext<TransfersDbContext>(options =>
             "__EFMigrationsHistory",
             "transfers")));
 
-builder.Services.Configure<MonolithOptions>(
-    builder.Configuration.GetSection(MonolithOptions.SectionName));
-
 builder.Services.Configure<RabbitMqOptions>(
     builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 
 builder.Services.Configure<OutboxOptions>(
     builder.Configuration.GetSection(OutboxOptions.SectionName));
 
-var monolithBaseUrl = builder.Configuration["Monolith:BaseUrl"]
-    ?? throw new InvalidOperationException("No se configuró Monolith:BaseUrl.");
-
-var internalApiKey = builder.Configuration["Monolith:InternalApiKey"];
-if (string.IsNullOrWhiteSpace(internalApiKey))
-    throw new InvalidOperationException("No se configuró Monolith:InternalApiKey.");
-
-builder.Services.AddHttpClient<IMonolithBankingClient, MonolithBankingClient>(client =>
-{
-    client.BaseAddress = new Uri(monolithBaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(15);
-});
-
 builder.Services.AddScoped<ITransfersService, TransfersApplicationService>();
 builder.Services.AddHostedService<OutboxPublisher>();
+builder.Services.AddHostedService<AccountTransferResultConsumer>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -126,7 +113,9 @@ static async Task EnsureSchemaAndApplyMigrationsAsync(
             }
 
             await using var scope = app.Services.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<TransfersDbContext>();
+            var db = scope.ServiceProvider
+                .GetRequiredService<TransfersDbContext>();
+
             await db.Database.MigrateAsync();
 
             logger.LogInformation(

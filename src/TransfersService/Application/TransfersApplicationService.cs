@@ -1,4 +1,5 @@
-using System.Text.Json;
+using FinBank.IntegrationEvents;
+using FinBank.IntegrationEvents.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TransfersService.Application.Contracts;
@@ -10,7 +11,6 @@ namespace TransfersService.Application;
 
 public sealed class TransfersApplicationService(
     TransfersDbContext db,
-    IMonolithBankingClient bankingClient,
     IOptions<RabbitMqOptions> rabbitOptions,
     ILogger<TransfersApplicationService> logger) : ITransfersService
 {
@@ -28,78 +28,51 @@ public sealed class TransfersApplicationService(
             request.Amount,
             request.Reference);
 
-        db.Transfers.Add(transfer);
-        await db.SaveChangesAsync(cancellationToken);
+        var occurredAt = DateTimeOffset.UtcNow;
+        var eventId = Guid.NewGuid();
+        var correlationId = transfer.Id;
 
-        try
-        {
-            await bankingClient.ApplyTransferAsync(
-                new AccountsTransferCommand(
-                    transfer.Id,
-                    transfer.UserId,
-                    transfer.SourceAccountId,
-                    transfer.TargetAccountId,
-                    transfer.Amount,
-                    transfer.Reference),
-                cancellationToken);
-
-            var occurredAt = DateTimeOffset.UtcNow;
-            var integrationEvent = new TransferCompletedIntegrationEvent(
-                EventId: Guid.NewGuid(),
-                TransferId: transfer.Id,
-                UserId: transfer.UserId,
-                SourceAccountId: transfer.SourceAccountId,
-                TargetAccountId: transfer.TargetAccountId,
-                Amount: transfer.Amount,
-                Currency: "BOB",
-                Reference: transfer.Reference,
-                OccurredAtUtc: occurredAt);
-
-            var payload = JsonSerializer.Serialize(
-                integrationEvent,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-
-            transfer.Complete(occurredAt);
-            db.OutboxMessages.Add(
-                OutboxMessage.Create(
-                    integrationEvent.EventId,
-                    nameof(TransferCompletedIntegrationEvent),
-                    _rabbit.RoutingKey,
-                    payload,
-                    occurredAt));
-
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            logger.LogInformation(
-                "Transferencia {TransferId} completada; evento {EventId} almacenado en Outbox.",
+        var cloudEvent = CloudEventFactory.Create(
+            EventCatalog.TransferRequestedV1,
+            source: "finbank/transfers-service",
+            subject: $"transfer/{transfer.Id:N}",
+            correlationId: correlationId,
+            causationId: null,
+            data: new TransferRequestedV1(
                 transfer.Id,
-                integrationEvent.EventId);
+                transfer.UserId,
+                transfer.SourceAccountId,
+                transfer.TargetAccountId,
+                transfer.Amount,
+                "BOB",
+                transfer.Reference),
+            eventId: eventId,
+            occurredAt: occurredAt);
 
-            return Map(transfer);
-        }
-        catch (MonolithBankingException ex)
-        {
-            transfer.Fail(ex.Message);
-            await db.SaveChangesAsync(cancellationToken);
-            throw;
-        }
-        catch (HttpRequestException ex)
-        {
-            transfer.Fail("No fue posible contactar al módulo Accounts.");
-            await db.SaveChangesAsync(cancellationToken);
+        var payload = CloudEventJson.Serialize(cloudEvent);
 
-            logger.LogError(
-                ex,
-                "No fue posible contactar al monolito para la transferencia {TransferId}.",
-                transfer.Id);
+        await using var transaction =
+            await db.Database.BeginTransactionAsync(cancellationToken);
 
-            throw new MonolithBankingException(
-                StatusCodes.Status503ServiceUnavailable,
-                "El módulo Accounts no está disponible temporalmente.");
-        }
+        db.Transfers.Add(transfer);
+        db.OutboxMessages.Add(
+            OutboxMessage.Create(
+                cloudEvent.Id,
+                cloudEvent.Type,
+                _rabbit.TransferRequestedRoutingKey,
+                payload,
+                occurredAt));
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Transferencia {TransferId} creada en Pending; CloudEvent {EventId} guardado en Outbox. CorrelationId {CorrelationId}.",
+            transfer.Id,
+            cloudEvent.Id,
+            cloudEvent.CorrelationId);
+
+        return Map(transfer);
     }
 
     public async Task<IReadOnlyList<TransferResponse>> ListAsync(

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using ModularBank.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +56,7 @@ builder.Services.AddAccountsModule(connectionString);
 builder.Services.AddNotificationsModule(builder.Configuration);
 
 builder.Services.AddAuditModule(connectionString);
+builder.Services.AddSagaMessaging(builder.Configuration);
 
 var app = builder.Build();
 
@@ -80,7 +82,6 @@ app.MapGet("/health", () => "ok");
 
 app.MapAuthEndpoints();
 app.MapAccountsEndpoints();
-app.MapInternalTransfersEndpoints();
 
 // ADR-001: /notifications ya no se publica desde el monolito.
 // YARP envÃ­a esa ruta al microservicio extraÃ­do.
@@ -90,4 +91,5 @@ app.MapAuditEndpoints();
 app.Run();
 
 public partial class Program;
+
 

@@ -1,7 +1,9 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+﻿FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY ["src/TransfersService/TransfersService.csproj", "src/TransfersService/"]
+COPY ["src/BuildingBlocks/FinBank.IntegrationEvents/FinBank.IntegrationEvents.csproj", "src/BuildingBlocks/FinBank.IntegrationEvents/"]
+COPY ["src/BuildingBlocks/FinBank.RabbitMqResilience/FinBank.RabbitMqResilience.csproj", "src/BuildingBlocks/FinBank.RabbitMqResilience/"]
 RUN dotnet restore "src/TransfersService/TransfersService.csproj"
 
 COPY . .
@@ -26,3 +28,4 @@ RUN chown -R finbank:finbank /app /home/finbank
 USER 10001
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "TransfersService.dll"]
+

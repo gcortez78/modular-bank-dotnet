@@ -1,4 +1,6 @@
 using System.Text;
+using FinBank.IntegrationEvents;
+using FinBank.RabbitMqResilience;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
@@ -29,7 +31,7 @@ public sealed class OutboxPublisher(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error no controlado en el publicador Outbox.");
+                logger.LogError(ex, "Error no controlado en Transfers Outbox.");
             }
 
             await Task.Delay(
@@ -38,7 +40,8 @@ public sealed class OutboxPublisher(
         }
     }
 
-    private async Task PublishPendingMessagesAsync(CancellationToken cancellationToken)
+    private async Task PublishPendingMessagesAsync(
+        CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TransfersDbContext>();
@@ -60,12 +63,13 @@ public sealed class OutboxPublisher(
             Password = _rabbit.Password,
             VirtualHost = _rabbit.VirtualHost,
             AutomaticRecoveryEnabled = true,
-            TopologyRecoveryEnabled = true,
-            };
+            TopologyRecoveryEnabled = true
+        };
 
         await using var connection = await factory.CreateConnectionAsync(
             "finbank-transfers-outbox",
             cancellationToken);
+
         await using var channel = await connection.CreateChannelAsync(
             new CreateChannelOptions(
                 publisherConfirmationsEnabled: true,
@@ -73,8 +77,8 @@ public sealed class OutboxPublisher(
             cancellationToken);
 
         await channel.ExchangeDeclareAsync(
-            exchange: _rabbit.Exchange,
-            type: ExchangeType.Topic,
+            _rabbit.Exchange,
+            ExchangeType.Topic,
             durable: true,
             autoDelete: false,
             arguments: null,
@@ -84,37 +88,28 @@ public sealed class OutboxPublisher(
         {
             try
             {
-                var properties = new BasicProperties
-                {
-                    Persistent = true,
-                    ContentType = "application/json",
-                    Type = message.EventType,
-                    MessageId = message.Id.ToString("N"),
-                    Timestamp = new AmqpTimestamp(message.OccurredAt.ToUnixTimeSeconds()),
-                    Headers = new Dictionary<string, object?>
-                    {
-                        ["event-version"] = "1",
-                        ["producer"] = "transfers-service"
-                    }
-                };
-
-                var body = Encoding.UTF8.GetBytes(message.PayloadJson);
+                var metadata = CloudEventJson.ReadMetadata(message.PayloadJson);
+                var properties = CloudEventBasicProperties.Create(
+                    metadata,
+                    message.OccurredAt,
+                    "transfers-service");
 
                 await channel.BasicPublishAsync(
-                    exchange: _rabbit.Exchange,
-                    routingKey: message.RoutingKey,
+                    _rabbit.Exchange,
+                    message.RoutingKey,
                     mandatory: true,
                     basicProperties: properties,
-                    body: body,
+                    body: Encoding.UTF8.GetBytes(message.PayloadJson),
                     cancellationToken: cancellationToken);
 
                 message.MarkProcessed(DateTimeOffset.UtcNow);
 
                 logger.LogInformation(
-                    "Evento {EventType} {EventId} publicado con routing key {RoutingKey}.",
-                    message.EventType,
-                    message.Id,
-                    message.RoutingKey);
+                    "CloudEvent {EventType} {EventId} publicado con routing key {RoutingKey}; CorrelationId {CorrelationId}.",
+                    metadata.Type,
+                    metadata.Id,
+                    message.RoutingKey,
+                    metadata.CorrelationId);
             }
             catch (Exception ex)
             {
@@ -122,7 +117,7 @@ public sealed class OutboxPublisher(
 
                 logger.LogWarning(
                     ex,
-                    "No se pudo publicar el evento Outbox {EventId}. Intento {Attempt}.",
+                    "No se pudo publicar Transfers Outbox {EventId}. Intento {Attempt}.",
                     message.Id,
                     message.Attempts);
             }

@@ -1,0 +1,18 @@
+services:
+  transfers-service:
+    environment:
+      RabbitMq__RetryExchange: finbank.events.retry
+      RabbitMq__RetryDelaysSeconds: "5,20,80"
+      RabbitMq__MaxPayloadBytes: 262144
+
+  notifications-service:
+    environment:
+      RabbitMq__RetryExchange: finbank.events.retry
+      RabbitMq__RetryDelaysSeconds: "5,20,80"
+      RabbitMq__MaxPayloadBytes: 262144
+
+  monolith:
+    environment:
+      RabbitMq__RetryExchange: finbank.events.retry
+      RabbitMq__RetryDelaysSeconds: "5,20,80"
+      RabbitMq__MaxPayloadBytes: 262144

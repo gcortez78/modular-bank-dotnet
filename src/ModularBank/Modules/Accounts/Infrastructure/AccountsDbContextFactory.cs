@@ -9,14 +9,14 @@ public sealed class AccountsDbContextFactory
     public AccountsDbContext CreateDbContext(string[] args)
     {
         var connectionString =
-            Environment.GetEnvironmentVariable("ConnectionStrings__Default")
+            Environment.GetEnvironmentVariable(
+                "ConnectionStrings__Default")
             ?? "Host=localhost;Port=5433;Database=modular_bank;Username=bank;Password=bank-local";
 
-        var optionsBuilder =
-            new DbContextOptionsBuilder<AccountsDbContext>();
+        var options = new DbContextOptionsBuilder<AccountsDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
 
-        optionsBuilder.UseNpgsql(connectionString);
-
-        return new AccountsDbContext(optionsBuilder.Options);
+        return new AccountsDbContext(options);
     }
 }

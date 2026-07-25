@@ -1,8 +1,10 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+﻿FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
 COPY ["src/NotificationsService/NotificationsService.csproj", "src/NotificationsService/"]
+COPY ["src/BuildingBlocks/FinBank.IntegrationEvents/FinBank.IntegrationEvents.csproj", "src/BuildingBlocks/FinBank.IntegrationEvents/"]
+COPY ["src/BuildingBlocks/FinBank.RabbitMqResilience/FinBank.RabbitMqResilience.csproj", "src/BuildingBlocks/FinBank.RabbitMqResilience/"]
 RUN dotnet restore "src/NotificationsService/NotificationsService.csproj"
 
 COPY . .
@@ -21,3 +23,4 @@ USER finbank
 EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "NotificationsService.dll"]
+

@@ -1,9 +1,11 @@
-using System.Globalization;
-using System.Text.Json;
-using Microsoft.Extensions.Options;
+﻿using System.Globalization;
+using FinBank.IntegrationEvents;
+using FinBank.IntegrationEvents.Contracts;
 using FinBank.NotificationsService.Application;
 using FinBank.NotificationsService.Application.Contracts;
 using FinBank.NotificationsService.Domain;
+using FinBank.RabbitMqResilience;
+using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -32,7 +34,7 @@ public sealed class TransferCompletedConsumer(
             {
                 logger.LogError(
                     ex,
-                    "El consumidor de TransferCompleted se desconectó; se reintentará.");
+                    "El consumidor de TransferCompleted se desconectó; reconexión en 5 segundos.");
 
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
@@ -49,18 +51,25 @@ public sealed class TransferCompletedConsumer(
             Password = _options.Password,
             VirtualHost = _options.VirtualHost,
             AutomaticRecoveryEnabled = true,
-            TopologyRecoveryEnabled = true,
-            };
+            TopologyRecoveryEnabled = true
+        };
 
-        await using var connection =
-            await factory.CreateConnectionAsync(
-                "finbank-notifications-transfer-consumer",
-                cancellationToken);
+        await using var connection = await factory.CreateConnectionAsync(
+            "finbank-notifications-transfer-consumer",
+            cancellationToken);
 
-        await using var channel =
-            await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        await using var channel = await connection.CreateChannelAsync(
+            new CreateChannelOptions(
+                publisherConfirmationsEnabled: true,
+                publisherConfirmationTrackingEnabled: true),
+            cancellationToken);
 
-        await DeclareTopologyAsync(channel, cancellationToken);
+        var topology = BuildTopology();
+        await RabbitMqResilienceTopology.DeclareAsync(
+            channel,
+            topology,
+            cancellationToken);
+
         await channel.BasicQosAsync(
             prefetchSize: 0,
             prefetchCount: 10,
@@ -68,11 +77,8 @@ public sealed class TransferCompletedConsumer(
             cancellationToken: cancellationToken);
 
         var consumer = new AsyncEventingBasicConsumer(channel);
-
         consumer.ReceivedAsync += async (_, eventArgs) =>
-        {
-            await HandleAsync(channel, eventArgs, cancellationToken);
-        };
+            await HandleAsync(channel, topology, eventArgs, cancellationToken);
 
         await channel.BasicConsumeAsync(
             queue: _options.Queue,
@@ -81,93 +87,37 @@ public sealed class TransferCompletedConsumer(
             cancellationToken: cancellationToken);
 
         logger.LogInformation(
-            "Consumidor conectado a {Queue} con routing key {RoutingKey}.",
+            "Notifications consume {RoutingKey} desde {Queue}; retry {RetryDelays}.",
+            _options.RoutingKey,
             _options.Queue,
-            _options.RoutingKey);
+            _options.RetryDelaysSeconds);
 
         await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
     }
 
-    private async Task DeclareTopologyAsync(
-        IChannel channel,
-        CancellationToken cancellationToken)
-    {
-        await channel.ExchangeDeclareAsync(
-            _options.Exchange,
-            ExchangeType.Topic,
-            durable: true,
-            autoDelete: false,
-            arguments: null,
-            cancellationToken: cancellationToken);
-
-        await channel.ExchangeDeclareAsync(
-            _options.DeadLetterExchange,
-            ExchangeType.Topic,
-            durable: true,
-            autoDelete: false,
-            arguments: null,
-            cancellationToken: cancellationToken);
-
-        var deadLetterRoutingKey = $"{_options.Queue}.dead";
-        var deadLetterQueue = $"{_options.Queue}.dlq";
-
-        var queueArguments = new Dictionary<string, object?>
-        {
-            ["x-dead-letter-exchange"] = _options.DeadLetterExchange,
-            ["x-dead-letter-routing-key"] = deadLetterRoutingKey
-        };
-
-        await channel.QueueDeclareAsync(
-            queue: _options.Queue,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: queueArguments,
-            cancellationToken: cancellationToken);
-
-        await channel.QueueBindAsync(
-            queue: _options.Queue,
-            exchange: _options.Exchange,
-            routingKey: _options.RoutingKey,
-            arguments: null,
-            cancellationToken: cancellationToken);
-
-        await channel.QueueDeclareAsync(
-            queue: deadLetterQueue,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null,
-            cancellationToken: cancellationToken);
-
-        await channel.QueueBindAsync(
-            queue: deadLetterQueue,
-            exchange: _options.DeadLetterExchange,
-            routingKey: deadLetterRoutingKey,
-            arguments: null,
-            cancellationToken: cancellationToken);
-    }
-
     private async Task HandleAsync(
         IChannel channel,
+        RabbitMqConsumerTopology topology,
         BasicDeliverEventArgs eventArgs,
         CancellationToken cancellationToken)
     {
         try
         {
-            var integrationEvent =
-                JsonSerializer.Deserialize<TransferCompletedIntegrationEvent>(
-                    eventArgs.Body.Span,
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web))
-                ?? throw new JsonException("El evento no contiene datos.");
+            var routingKey =
+                RabbitMqFailureHandler.GetEffectiveRoutingKey(eventArgs);
 
-            if (integrationEvent.EventId == Guid.Empty ||
-                integrationEvent.TransferId == Guid.Empty ||
-                integrationEvent.UserId == Guid.Empty)
+            if (routingKey != _options.RoutingKey)
             {
-                throw new JsonException(
-                    "El evento no contiene identificadores válidos.");
+                throw new NotSupportedException(
+                    $"Routing key no soportada: {routingKey}");
             }
+
+            var cloudEvent = CloudEventJson.DeserializeAndValidate<TransferCompletedV1>(
+                eventArgs.Body.Span,
+                EventCatalog.TransferCompletedV1,
+                _options.MaxPayloadBytes);
+
+            var data = cloudEvent.Data;
 
             await using var scope = scopeFactory.CreateAsyncScope();
             var notifications =
@@ -175,24 +125,23 @@ public sealed class TransferCompletedConsumer(
 
             var payload = new Dictionary<string, string>
             {
-                ["eventId"] = integrationEvent.EventId.ToString(),
-                ["transferId"] = integrationEvent.TransferId.ToString(),
-                ["sourceAccountId"] = integrationEvent.SourceAccountId.ToString(),
-                ["targetAccountId"] = integrationEvent.TargetAccountId.ToString(),
-                ["amount"] = integrationEvent.Amount.ToString(
-                    "0.00",
-                    CultureInfo.InvariantCulture),
-                ["currency"] = integrationEvent.Currency,
-                ["reference"] = integrationEvent.Reference ?? string.Empty
+                ["eventId"] = cloudEvent.Id.ToString(),
+                ["correlationId"] = cloudEvent.CorrelationId.ToString(),
+                ["causationId"] = cloudEvent.CausationId?.ToString() ?? string.Empty,
+                ["transferId"] = data.TransferId.ToString(),
+                ["sourceAccountId"] = data.SourceAccountId.ToString(),
+                ["targetAccountId"] = data.TargetAccountId.ToString(),
+                ["amount"] = data.Amount.ToString("0.00", CultureInfo.InvariantCulture),
+                ["currency"] = data.Currency,
+                ["reference"] = data.Reference ?? string.Empty
             };
 
             await notifications.CreateAsync(
                 new CreateNotificationRequest(
-                    UserId: integrationEvent.UserId,
+                    UserId: data.UserId,
                     Type: NotificationType.TransferSent,
                     Payload: payload,
-                    IdempotencyKey:
-                        $"transfer-completed:{integrationEvent.EventId:N}"),
+                    IdempotencyKey: $"transfer-completed:{cloudEvent.Id:N}"),
                 cancellationToken);
 
             await channel.BasicAckAsync(
@@ -201,34 +150,36 @@ public sealed class TransferCompletedConsumer(
                 cancellationToken);
 
             logger.LogInformation(
-                "Evento {EventId} consumido; notificación creada para transferencia {TransferId}.",
-                integrationEvent.EventId,
-                integrationEvent.TransferId);
-        }
-        catch (JsonException ex)
-        {
-            logger.LogError(
-                ex,
-                "Evento inválido enviado a la DLQ. DeliveryTag {DeliveryTag}.",
-                eventArgs.DeliveryTag);
-
-            await channel.BasicRejectAsync(
-                eventArgs.DeliveryTag,
-                requeue: false,
-                cancellationToken);
+                "CloudEvent {EventId} consumido; notificación creada para transferencia {TransferId}; CorrelationId {CorrelationId}.",
+                cloudEvent.Id,
+                data.TransferId,
+                cloudEvent.CorrelationId);
         }
         catch (Exception ex)
         {
+            var result = await RabbitMqFailureHandler.HandleAsync(
+                channel,
+                eventArgs,
+                topology,
+                ex,
+                cancellationToken);
+
             logger.LogWarning(
                 ex,
-                "Falló el procesamiento del evento; se reencolará. DeliveryTag {DeliveryTag}.",
-                eventArgs.DeliveryTag);
-
-            await channel.BasicNackAsync(
-                eventArgs.DeliveryTag,
-                multiple: false,
-                requeue: true,
-                cancellationToken);
+                "TransferCompleted no procesado. Disposición {Disposition}; retry {RetryCount}; destino {Destination}; MessageId {MessageId}.",
+                result.Disposition,
+                result.RetryCount,
+                result.Destination,
+                eventArgs.BasicProperties.MessageId);
         }
     }
+
+    private RabbitMqConsumerTopology BuildTopology() =>
+        new(
+            _options.Exchange,
+            _options.RetryExchange,
+            _options.DeadLetterExchange,
+            _options.Queue,
+            [_options.RoutingKey],
+            _options.GetRetryDelays());
 }

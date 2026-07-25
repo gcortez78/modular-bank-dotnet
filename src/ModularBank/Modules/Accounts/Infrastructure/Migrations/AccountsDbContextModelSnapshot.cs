@@ -23,6 +23,30 @@ namespace ModularBank.Modules.Accounts.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ModularBank.Messaging.SagaInboxMessage", b =>
+                {
+                    b.Property<string>("ConsumerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("consumer_name");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.HasKey("ConsumerName", "EventId")
+                        .HasName("pk_integration_inbox_messages");
+
+                    b.HasIndex("ProcessedAt")
+                        .HasDatabaseName("ix_integration_inbox_messages_processed_at");
+
+                    b.ToTable("inbox_messages", "integration");
+                });
+
             modelBuilder.Entity("ModularBank.Modules.Accounts.Domain.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -50,6 +74,56 @@ namespace ModularBank.Modules.Accounts.Infrastructure.Migrations
                     b.ToTable("accounts", "accounts");
                 });
 
+            modelBuilder.Entity("ModularBank.Modules.Accounts.Domain.AccountOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("RoutingKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("routing_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_outbox_messages");
+
+                    b.HasIndex("ProcessedAt", "OccurredAt")
+                        .HasDatabaseName("ix_account_outbox_pending");
+
+                    b.ToTable("account_outbox_messages", "accounts");
+                });
+
             modelBuilder.Entity("ModularBank.Modules.Accounts.Domain.ProcessedTransferCommand", b =>
                 {
                     b.Property<Guid>("TransferId")
@@ -62,6 +136,11 @@ namespace ModularBank.Modules.Accounts.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount");
 
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
                     b.Property<DateTimeOffset>("ProcessedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("processed_at");
@@ -70,6 +149,16 @@ namespace ModularBank.Modules.Accounts.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("reference");
+
+                    b.Property<Guid?>("RequestEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_event_id");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("result");
 
                     b.Property<Guid>("SourceAccountId")
                         .HasColumnType("uuid")
@@ -88,6 +177,10 @@ namespace ModularBank.Modules.Accounts.Infrastructure.Migrations
 
                     b.HasIndex("ProcessedAt")
                         .HasDatabaseName("ix_processed_transfer_commands_processed_at");
+
+                    b.HasIndex("RequestEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_processed_transfer_commands_request_event_id");
 
                     b.ToTable("processed_transfer_commands", "accounts");
                 });

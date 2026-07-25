@@ -1,7 +1,9 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+﻿FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY ["src/ModularBank/ModularBank.csproj", "src/ModularBank/"]
+COPY ["src/BuildingBlocks/FinBank.IntegrationEvents/FinBank.IntegrationEvents.csproj", "src/BuildingBlocks/FinBank.IntegrationEvents/"]
+COPY ["src/BuildingBlocks/FinBank.RabbitMqResilience/FinBank.RabbitMqResilience.csproj", "src/BuildingBlocks/FinBank.RabbitMqResilience/"]
 RUN dotnet restore "src/ModularBank/ModularBank.csproj"
 
 COPY . .
@@ -26,3 +28,4 @@ RUN chown -R finbank:finbank /app
 USER finbank
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "ModularBank.dll"]
+

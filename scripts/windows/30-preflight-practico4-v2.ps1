@@ -1,0 +1,59 @@
+﻿param(
+    [string]$RepoRoot = (Get-Location).Path
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+function Write-Step([string]$Text) {
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor DarkGray
+    Write-Host $Text -ForegroundColor Cyan
+    Write-Host "============================================================" -ForegroundColor DarkGray
+}
+
+Set-Location $RepoRoot
+
+Write-Step "Preflight Práctico 4"
+
+if (-not (Test-Path ".git")) {
+    throw "RepoRoot no corresponde a un repositorio Git: $RepoRoot"
+}
+
+$required = @(
+    "compose.yaml",
+    "src\TransfersService\TransfersService.csproj",
+    "src\TransfersService\Messaging\AccountTransferResultConsumer.cs",
+    "src\TransfersService\Application\TransfersApplicationService.cs",
+    "src\NotificationsService\NotificationsService.csproj",
+    "src\NotificationsService\Messaging\TransferCompletedConsumer.cs",
+    "src\ModularBank\ModularBank.csproj",
+    "src\ModularBank\Messaging\AccountsTransferRequestedConsumer.cs",
+    "src\ModularBank\Messaging\AuditTransferResultConsumer.cs",
+    "src\ModularBank\Messaging\AccountsOutboxPublisher.cs"
+)
+
+$missing = @($required | Where-Object { -not (Test-Path $_) })
+if ($missing.Count -gt 0) {
+    $missing | ForEach-Object { Write-Host ("FALTA: {0}" -f $_) -ForegroundColor Red }
+    throw "El repositorio no contiene todos los artefactos de la Saga ADR-002."
+}
+
+if (Test-Path "src\ModularBank\Modules\Accounts\Api\InternalTransfersEndpoints.cs") {
+    throw "Todavía existe InternalTransfersEndpoints.cs. Retire el flujo HTTP síncrono antes de aplicar el Práctico 4."
+}
+
+$program = Get-Content "src\ModularBank\Program.cs" -Raw
+$registrations = [regex]::Matches($program, 'AddSagaMessaging\s*\(').Count
+if ($registrations -ne 1) {
+    throw ("AddSagaMessaging debe aparecer una sola vez; se encontraron {0}." -f $registrations)
+}
+
+$routes = Get-ChildItem "src\TransfersService" -Recurse -File -Filter "*.cs" |
+    Select-String -Pattern 'MapPost\("/"|MapGet\("/"'
+if ($routes) {
+    $routes | Format-Table Path, LineNumber, Line -AutoSize
+    throw 'Se detectaron rutas raíz duplicables ("/" dentro de MapGroup). Mantenga solamente MapPost("") y MapGet("").'
+}
+
+Write-Host "Preflight aprobado." -ForegroundColor Green

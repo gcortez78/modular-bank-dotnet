@@ -16,3 +16,11 @@ notifications-data-backup.sql
 
 # Respaldos locales del instalador ADR-002
 .adr002-backup/
+
+# Práctico 4 - archivos locales
+.practico4-backup/
+.adr002-saga-backup/
+evidencias/
+*.log
+*.bak
+*.tmp

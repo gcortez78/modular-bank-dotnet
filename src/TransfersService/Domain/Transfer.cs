@@ -1,4 +1,4 @@
-namespace TransfersService.Domain;
+﻿namespace TransfersService.Domain;
 
 public sealed class Transfer
 {
@@ -34,7 +34,9 @@ public sealed class Transfer
             throw new ArgumentException("Las cuentas origen y destino deben ser diferentes.");
 
         if (amount <= 0)
-            throw new ArgumentOutOfRangeException(nameof(amount), "El monto debe ser mayor que cero.");
+            throw new ArgumentOutOfRangeException(
+                nameof(amount),
+                "El monto debe ser mayor que cero.");
 
         return new Transfer
         {
@@ -43,7 +45,9 @@ public sealed class Transfer
             SourceAccountId = sourceAccountId,
             TargetAccountId = targetAccountId,
             Amount = decimal.Round(amount, 2, MidpointRounding.AwayFromZero),
-            Reference = string.IsNullOrWhiteSpace(reference) ? null : reference.Trim(),
+            Reference = string.IsNullOrWhiteSpace(reference)
+                ? null
+                : reference.Trim(),
             Status = TransferStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -51,14 +55,28 @@ public sealed class Transfer
 
     public void Complete(DateTimeOffset completedAt)
     {
+        if (Status != TransferStatus.Pending)
+            return;
+
         Status = TransferStatus.Completed;
         CompletedAt = completedAt;
         FailureReason = null;
     }
 
-    public void Fail(string reason)
+    public void Fail(string reason, DateTimeOffset failedAt)
     {
+        if (Status != TransferStatus.Pending)
+            return;
+
         Status = TransferStatus.Failed;
-        FailureReason = reason.Length <= 500 ? reason : reason[..500];
+        CompletedAt = failedAt;
+
+        var normalized = string.IsNullOrWhiteSpace(reason)
+            ? "La transferencia fue rechazada."
+            : reason.Trim();
+
+        FailureReason = normalized.Length <= 500
+            ? normalized
+            : normalized[..500];
     }
 }
