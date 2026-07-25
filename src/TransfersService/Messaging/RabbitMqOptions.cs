@@ -1,0 +1,14 @@
+namespace TransfersService.Messaging;
+
+public sealed class RabbitMqOptions
+{
+    public const string SectionName = "RabbitMq";
+
+    public string Host { get; init; } = "rabbitmq";
+    public int Port { get; init; } = 5672;
+    public string UserName { get; init; } = "finbank";
+    public string Password { get; init; } = null!;
+    public string VirtualHost { get; init; } = "/";
+    public string Exchange { get; init; } = "finbank.events";
+    public string RoutingKey { get; init; } = "transfers.completed.v1";
+}

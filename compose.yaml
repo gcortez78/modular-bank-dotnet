@@ -5,9 +5,9 @@ services:
     image: postgres:16-alpine
     container_name: finbank-postgres-monolith
     environment:
-      POSTGRES_DB: "${MONOLITH_DB:-modular_bank}"
-      POSTGRES_USER: "${MONOLITH_DB_USER:-bank}"
-      POSTGRES_PASSWORD: "${MONOLITH_DB_PASSWORD:-bank-local}"
+      POSTGRES_DB: ${MONOLITH_DB:-modular_bank}
+      POSTGRES_USER: ${MONOLITH_DB_USER:-bank}
+      POSTGRES_PASSWORD: ${MONOLITH_DB_PASSWORD:-bank-local}
     ports:
       - "127.0.0.1:${MONOLITH_DB_PORT:-5433}:5432"
     volumes:
@@ -16,7 +16,11 @@ services:
       - data-monolith
       - host-access
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${MONOLITH_DB_USER:-bank} -d ${MONOLITH_DB:-modular_bank}"
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -27,9 +31,9 @@ services:
     image: postgres:16-alpine
     container_name: finbank-postgres-notifications
     environment:
-      POSTGRES_DB: "${NOTIFICATIONS_DB:-notifications_db}"
-      POSTGRES_USER: "${NOTIFICATIONS_DB_USER:-notifications}"
-      POSTGRES_PASSWORD: "${NOTIFICATIONS_DB_PASSWORD:-notifications-local}"
+      POSTGRES_DB: ${NOTIFICATIONS_DB:-notifications_db}
+      POSTGRES_USER: ${NOTIFICATIONS_DB_USER:-notifications}
+      POSTGRES_PASSWORD: ${NOTIFICATIONS_DB_PASSWORD:-notifications-local}
     ports:
       - "127.0.0.1:${NOTIFICATIONS_DB_PORT:-5434}:5432"
     volumes:
@@ -38,7 +42,37 @@ services:
       - data-notifications
       - host-access
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${NOTIFICATIONS_DB_USER:-notifications} -d ${NOTIFICATIONS_DB:-notifications_db}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  postgres-transfers:
+    image: postgres:16-alpine
+    container_name: finbank-postgres-transfers
+    environment:
+      POSTGRES_DB: ${TRANSFERS_DB:-transfers_db}
+      POSTGRES_USER: ${TRANSFERS_DB_USER:-transfers}
+      POSTGRES_PASSWORD: ${TRANSFERS_DB_PASSWORD:-transfers-local}
+    ports:
+      - "127.0.0.1:${TRANSFERS_DB_PORT:-5435}:5432"
+    volumes:
+      - postgres_transfers_data:/var/lib/postgresql/data
+    networks:
+      - data-transfers
+      - host-access
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${TRANSFERS_DB_USER:-transfers} -d ${TRANSFERS_DB:-transfers_db}"
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -49,8 +83,8 @@ services:
     image: rabbitmq:4.3.2-management-alpine
     container_name: finbank-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-finbank}"
-      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:-finbank-local}"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-finbank}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-finbank-local}
     ports:
       - "127.0.0.1:${RABBITMQ_AMQP_PORT:-5672}:5672"
       - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
@@ -66,25 +100,34 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 25s
+      start_period: 20s
     restart: unless-stopped
 
   notifications-service:
-    image: plataforma-base-finbank-notifications:1.0
     build:
       context: .
       dockerfile: src/NotificationsService/Dockerfile
+    image: plataforma-base-finbank-notifications:2.0
     container_name: finbank-notifications-service
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__Default: "Host=postgres-notifications;Port=5432;Database=${NOTIFICATIONS_DB:-notifications_db};Username=${NOTIFICATIONS_DB_USER:-notifications};Password=${NOTIFICATIONS_DB_PASSWORD:-notifications-local}"
-      Jwt__Secret: "${JWT_SECRET}"
-      InternalApiKey: "${NOTIFICATIONS_INTERNAL_API_KEY}"
-    expose:
-      - "8080"
+      ConnectionStrings__Default: "Host=postgres-notifications;Port=5432;Database=${NOTIFICATIONS_DB:-notifications_db};Username=${NOTIFICATIONS_DB_USER:-notifications};Password=${NOTIFICATIONS_DB_PASSWORD:-notifications-local};Search Path=notifications"
+      Jwt__Secret: ${JWT_SECRET:-finbank-local-jwt-secret-change-this-value-2026}
+      InternalApiKey: ${NOTIFICATIONS_INTERNAL_API_KEY:-finbank-notifications-internal-key-change-this-2026}
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER:-finbank}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-finbank-local}
+      RabbitMq__VirtualHost: /
+      RabbitMq__Exchange: finbank.events
+      RabbitMq__DeadLetterExchange: finbank.events.dlx
+      RabbitMq__Queue: notifications.transfer-completed.v1
+      RabbitMq__RoutingKey: transfers.completed.v1
     depends_on:
       postgres-notifications:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - backend
@@ -94,28 +137,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 35s
+      start_period: 30s
     restart: unless-stopped
 
   monolith:
-    image: plataforma-base-finbank-monolith:1.0
     build:
       context: .
       dockerfile: src/ModularBank/Dockerfile
+    image: plataforma-base-finbank-monolith:2.0
     container_name: finbank-monolith
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Default: "Host=postgres-monolith;Port=5432;Database=${MONOLITH_DB:-modular_bank};Username=${MONOLITH_DB_USER:-bank};Password=${MONOLITH_DB_PASSWORD:-bank-local}"
-      Jwt__Secret: "${JWT_SECRET}"
-      Jwt__AccessExpirationMinutes: "15"
-      Jwt__RefreshExpirationDays: "7"
-      Notifications__BaseUrl: "http://notifications-service:8080/"
-      Notifications__InternalApiKey: "${NOTIFICATIONS_INTERNAL_API_KEY}"
-    expose:
-      - "8080"
+      Jwt__Secret: ${JWT_SECRET:-finbank-local-jwt-secret-change-this-value-2026}
+      Notifications__BaseUrl: http://notifications-service:8080/
+      Notifications__InternalApiKey: ${NOTIFICATIONS_INTERNAL_API_KEY:-finbank-notifications-internal-key-change-this-2026}
+      Transfers__InternalApiKey: ${TRANSFERS_INTERNAL_API_KEY:-finbank-transfers-internal-key-change-this-2026}
     depends_on:
       postgres-monolith:
+        condition: service_healthy
+      notifications-service:
         condition: service_healthy
     networks:
       - backend
@@ -125,14 +167,55 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 40s
+      start_period: 30s
+    restart: unless-stopped
+
+  transfers-service:
+    build:
+      context: .
+      dockerfile: src/TransfersService/Dockerfile
+    image: plataforma-base-finbank-transfers:2.0
+    container_name: finbank-transfers-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: "Host=postgres-transfers;Port=5432;Database=${TRANSFERS_DB:-transfers_db};Username=${TRANSFERS_DB_USER:-transfers};Password=${TRANSFERS_DB_PASSWORD:-transfers-local};Search Path=transfers"
+      Jwt__Secret: ${JWT_SECRET:-finbank-local-jwt-secret-change-this-value-2026}
+      Monolith__BaseUrl: http://monolith:8080/
+      Monolith__InternalApiKey: ${TRANSFERS_INTERNAL_API_KEY:-finbank-transfers-internal-key-change-this-2026}
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER:-finbank}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-finbank-local}
+      RabbitMq__VirtualHost: /
+      RabbitMq__Exchange: finbank.events
+      RabbitMq__RoutingKey: transfers.completed.v1
+      Outbox__PollingIntervalSeconds: 2
+      Outbox__BatchSize: 20
+      Outbox__MaxAttempts: 20
+    depends_on:
+      postgres-transfers:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      monolith:
+        condition: service_healthy
+    networks:
+      - backend
+      - data-transfers
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     restart: unless-stopped
 
   gateway:
-    image: plataforma-base-finbank-gateway:1.0
     build:
       context: .
       dockerfile: src/Gateway/Dockerfile
+    image: plataforma-base-finbank-gateway:2.0
     container_name: finbank-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -142,6 +225,10 @@ services:
     depends_on:
       monolith:
         condition: service_healthy
+      notifications-service:
+        condition: service_healthy
+      transfers-service:
+        condition: service_healthy
     networks:
       - edge
       - backend
@@ -150,36 +237,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 20s
-    restart: unless-stopped
-
-  postgres-transfers:
-    profiles: ["future"]
-    image: postgres:16-alpine
-    container_name: finbank-postgres-transfers
-    environment:
-      POSTGRES_DB: "${TRANSFERS_DB:-transfers_db}"
-      POSTGRES_USER: "${TRANSFERS_DB_USER:-transfers}"
-      POSTGRES_PASSWORD: "${TRANSFERS_DB_PASSWORD:-transfers-local}"
-    ports:
-      - "127.0.0.1:${TRANSFERS_DB_PORT:-5435}:5432"
-    volumes:
-      - postgres_transfers_data:/var/lib/postgresql/data
-    networks:
-      - data-transfers
-      - host-access
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
 
 networks:
   edge:
-  host-access:
-    driver: bridge
   backend:
     internal: true
   data-monolith:
@@ -188,6 +250,7 @@ networks:
     internal: true
   data-transfers:
     internal: true
+  host-access:
 
 volumes:
   postgres_monolith_data:

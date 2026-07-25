@@ -13,3 +13,6 @@ TestResults/
 # Respaldos locales de base de datos
 notifications-data-backup.sql
 *-data-backup.sql
+
+# Respaldos locales del instalador ADR-002
+.adr002-backup/

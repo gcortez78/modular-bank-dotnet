@@ -1,68 +1,75 @@
 using System.Text;
-using FinBank.NotificationsService.Api;
-using FinBank.NotificationsService.Application;
-using FinBank.NotificationsService.Infrastructure;
-using FinBank.NotificationsService.Messaging;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using TransfersService.Api;
+using TransfersService.Application;
+using TransfersService.Infrastructure;
+using TransfersService.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
-    ?? throw new InvalidOperationException(
-        "ConnectionStrings:Default no está configurada.");
+    ?? throw new InvalidOperationException("No se configuró ConnectionStrings:Default.");
 
-var jwtSecret = builder.Configuration["Jwt:Secret"];
-if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException("No se configuró Jwt:Secret.");
+
+if (Encoding.UTF8.GetByteCount(jwtSecret) < 32)
+    throw new InvalidOperationException("Jwt:Secret debe tener al menos 32 bytes.");
+
+builder.Services.AddDbContext<TransfersDbContext>(options =>
+    options.UseNpgsql(
+        connectionString,
+        npgsql => npgsql.MigrationsHistoryTable(
+            "__EFMigrationsHistory",
+            "transfers")));
+
+builder.Services.Configure<MonolithOptions>(
+    builder.Configuration.GetSection(MonolithOptions.SectionName));
+
+builder.Services.Configure<RabbitMqOptions>(
+    builder.Configuration.GetSection(RabbitMqOptions.SectionName));
+
+builder.Services.Configure<OutboxOptions>(
+    builder.Configuration.GetSection(OutboxOptions.SectionName));
+
+var monolithBaseUrl = builder.Configuration["Monolith:BaseUrl"]
+    ?? throw new InvalidOperationException("No se configuró Monolith:BaseUrl.");
+
+var internalApiKey = builder.Configuration["Monolith:InternalApiKey"];
+if (string.IsNullOrWhiteSpace(internalApiKey))
+    throw new InvalidOperationException("No se configuró Monolith:InternalApiKey.");
+
+builder.Services.AddHttpClient<IMonolithBankingClient, MonolithBankingClient>(client =>
 {
-    throw new InvalidOperationException(
-        "Jwt:Secret debe configurarse y tener al menos 32 caracteres.");
-}
+    client.BaseAddress = new Uri(monolithBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 
-var internalApiKey = builder.Configuration["InternalApiKey"];
-if (string.IsNullOrWhiteSpace(internalApiKey) || internalApiKey.Length < 32)
-{
-    throw new InvalidOperationException(
-        "InternalApiKey debe configurarse y tener al menos 32 caracteres.");
-}
+builder.Services.AddScoped<ITransfersService, TransfersApplicationService>();
+builder.Services.AddHostedService<OutboxPublisher>();
 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.RequireHttpsMetadata = false;
         options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSecret)),
             ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            RequireSignedTokens = true,
             ClockSkew = TimeSpan.Zero
         };
     });
 
 builder.Services.AddAuthorization();
-
-builder.Services.AddDbContext<NotificationsDbContext>(options =>
-    options.UseNpgsql(
-        connectionString,
-        npgsql => npgsql.MigrationsHistoryTable(
-            "__EFMigrationsHistory",
-            "notifications")));
-
-builder.Services.AddScoped<INotificationsService, PostgresNotificationsService>();
-builder.Services.AddScoped<InternalApiKeyFilter>();
-
-builder.Services.Configure<RabbitMqOptions>(
-    builder.Configuration.GetSection(RabbitMqOptions.SectionName));
-
-builder.Services.AddHostedService<TransferCompletedConsumer>();
 
 var app = builder.Build();
 
@@ -74,7 +81,7 @@ app.UseAuthorization();
 app.MapGet(
     "/health",
     async (
-        NotificationsDbContext db,
+        TransfersDbContext db,
         CancellationToken cancellationToken) =>
     {
         var canConnect = await db.Database.CanConnectAsync(cancellationToken);
@@ -83,7 +90,7 @@ app.MapGet(
             ? Results.Ok(new
             {
                 status = "ok",
-                service = "notifications-service",
+                service = "transfers-service",
                 database = "connected"
             })
             : Results.Problem(
@@ -93,7 +100,7 @@ app.MapGet(
     })
     .AllowAnonymous();
 
-app.MapNotificationsEndpoints();
+app.MapTransfersEndpoints();
 
 app.Run();
 
@@ -103,7 +110,7 @@ static async Task EnsureSchemaAndApplyMigrationsAsync(
 {
     const int maxAttempts = 10;
     var logger = app.Services.GetRequiredService<ILoggerFactory>()
-        .CreateLogger("NotificationsService.Migrations");
+        .CreateLogger("TransfersService.Migrations");
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++)
     {
@@ -114,18 +121,16 @@ static async Task EnsureSchemaAndApplyMigrationsAsync(
                 await connection.OpenAsync();
                 await using var command = connection.CreateCommand();
                 command.CommandText =
-                    "CREATE SCHEMA IF NOT EXISTS notifications AUTHORIZATION CURRENT_USER;";
+                    "CREATE SCHEMA IF NOT EXISTS transfers AUTHORIZATION CURRENT_USER;";
                 await command.ExecuteNonQueryAsync();
             }
 
             await using var scope = app.Services.CreateAsyncScope();
-            var db = scope.ServiceProvider
-                .GetRequiredService<NotificationsDbContext>();
-
+            var db = scope.ServiceProvider.GetRequiredService<TransfersDbContext>();
             await db.Database.MigrateAsync();
 
             logger.LogInformation(
-                "Migraciones de Notifications aplicadas correctamente.");
+                "Migraciones de Transfers aplicadas correctamente.");
 
             return;
         }
@@ -135,7 +140,7 @@ static async Task EnsureSchemaAndApplyMigrationsAsync(
 
             logger.LogWarning(
                 ex,
-                "PostgreSQL de Notifications no está disponible. Intento {Attempt}/{MaxAttempts}; reintento en {Delay}.",
+                "PostgreSQL de Transfers no está disponible. Intento {Attempt}/{MaxAttempts}; reintento en {Delay}.",
                 attempt,
                 maxAttempts,
                 delay);
@@ -146,7 +151,7 @@ static async Task EnsureSchemaAndApplyMigrationsAsync(
         {
             logger.LogCritical(
                 ex,
-                "Error permanente aplicando migraciones de Notifications.");
+                "Error permanente aplicando migraciones de Transfers.");
 
             throw;
         }

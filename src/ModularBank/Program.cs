@@ -1,8 +1,7 @@
-using ModularBank.Modules.Auth.Infrastructure;
+﻿using ModularBank.Modules.Auth.Infrastructure;
 using ModularBank.Modules.Auth.Api;
 using ModularBank.Modules.Accounts.Infrastructure;
 using ModularBank.Modules.Accounts.Api;
-using ModularBank.Modules.Transfers.Infrastructure;
 using ModularBank.Modules.Transfers.Api;
 using ModularBank.Modules.Notifications.Infrastructure;
 using ModularBank.Modules.Audit.Infrastructure;
@@ -50,9 +49,8 @@ builder.Services.AddSingleton<JwtUtil>();
 
 builder.Services.AddAuthModule(connectionString);
 builder.Services.AddAccountsModule(connectionString);
-builder.Services.AddTransfersModule(connectionString);
 
-// ADR-001: la interfaz permanece en el monolito, pero la implementación
+// ADR-001: la interfaz permanece en el monolito, pero la implementaciÃ³n
 // ahora es un cliente HTTP hacia Notifications Service.
 builder.Services.AddNotificationsModule(builder.Configuration);
 
@@ -66,7 +64,6 @@ using (var scope = app.Services.CreateScope())
     {
         scope.ServiceProvider.GetRequiredService<AuthDbContext>(),
         scope.ServiceProvider.GetRequiredService<AccountsDbContext>(),
-        scope.ServiceProvider.GetRequiredService<TransfersDbContext>(),
         scope.ServiceProvider.GetRequiredService<AuditDbContext>()
     };
 
@@ -83,13 +80,14 @@ app.MapGet("/health", () => "ok");
 
 app.MapAuthEndpoints();
 app.MapAccountsEndpoints();
-app.MapTransfersEndpoints();
+app.MapInternalTransfersEndpoints();
 
 // ADR-001: /notifications ya no se publica desde el monolito.
-// YARP envía esa ruta al microservicio extraído.
+// YARP envÃ­a esa ruta al microservicio extraÃ­do.
 
 app.MapAuditEndpoints();
 
 app.Run();
 
 public partial class Program;
+
