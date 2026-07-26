@@ -192,23 +192,76 @@ graph TD
 
 ```mermaid
 graph LR
-    subgraph módulo
-        API["Api/\n(Endpoint)"]
-        APP["Application/\n(UseCase + Interface)"]
-        INFRA["Infrastructure/\n(Service + DbContext)"]
-        DOMAIN["Domain/\n(Entity)"]
+
+    %% =====================================================
+    %% ESTRUCTURA INTERNA GENERAL
+    %% =====================================================
+
+    subgraph MODULE["Estructura interna de cada módulo o microservicio"]
+        direction LR
+
+        API["Api/<br/>Endpoints HTTP<br/>Controllers / Minimal API"]
+
+        APP["Application/<br/>Use Cases<br/>Interfaces<br/>Commands / Queries"]
+
+        DOMAIN["Domain/<br/>Entities<br/>Value Objects<br/>Domain Rules<br/>Domain Events"]
+
+        INFRA["Infrastructure/<br/>Services<br/>Repositories<br/>DbContext<br/>RabbitMQ<br/>Outbox / Inbox"]
+
+        DB[("Base de datos<br/>del módulo")]
+
+        API --> APP
+        APP --> DOMAIN
+
+        INFRA --> APP
+        INFRA --> DOMAIN
+        INFRA --> DB
     end
 
-    API --> APP
-    APP --> DOMAIN
-    INFRA --> APP
-    INFRA --> DOMAIN
+    %% =====================================================
+    %% COMUNICACIÓN CON OTROS COMPONENTES
+    %% =====================================================
 
-    subgraph "otros módulos"
-        EXT["Application/\n(Interface pública)"]
+    subgraph EXTERNAL["Comunicación con otros módulos y servicios"]
+        direction TB
+
+        PUBLIC["Application Contracts/<br/>Interfaces públicas internas"]
+
+        EVENTS["Integration Events/<br/>CloudEvents 1.0"]
+
+        BROKER[["RabbitMQ<br/>finbank.events"]]
+
+        HTTP["API Gateway / YARP<br/>Comunicación HTTP externa"]
     end
 
-    APP -.->|"solo a través\nde interfaces"| EXT
+    %% Dentro del monolito
+    APP -.->|"Solo mediante interfaces<br/>de Application"| PUBLIC
+
+    %% Entre microservicios
+    INFRA -->|"Publica eventos<br/>mediante Outbox"| EVENTS
+    EVENTS --> BROKER
+
+    BROKER -->|"Entrega eventos"| INFRA
+
+    %% Entrada HTTP
+    HTTP --> API
+
+    %% =====================================================
+    %% OBSERVABILIDAD TRANSVERSAL
+    %% =====================================================
+
+    subgraph OBS["Observabilidad transversal"]
+        OTEL["OpenTelemetry SDK<br/>Logs + Métricas + Trazas"]
+        COLLECTOR["OpenTelemetry Collector"]
+        BACKENDS["Tempo / Prometheus / Loki<br/>Grafana"]
+    end
+
+    API -.-> OTEL
+    APP -.-> OTEL
+    INFRA -.-> OTEL
+
+    OTEL --> COLLECTOR
+    COLLECTOR --> BACKENDS
 ```
 
 ### Aislamiento de schemas en PostgreSQL
