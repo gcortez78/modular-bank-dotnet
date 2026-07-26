@@ -191,99 +191,169 @@ graph TD
 ### Capas internas de cada módulo
 
 ```mermaid
-graph LR
+graph TB
 
     %% =====================================================
-    %% ESTRUCTURA INTERNA GENERAL
+    %% MONOLITO REMANENTE
     %% =====================================================
 
-    subgraph MODULE["Estructura interna de cada módulo o microservicio"]
+    subgraph MONOLITH["Monolito remanente"]
         direction LR
 
-        API["Api/<br/>Endpoints HTTP<br/>Controllers / Minimal API"]
+        subgraph AUTH["Auth"]
+            AuthAPI["Api"]
+            AuthAPP["Application"]
+            AuthDOMAIN["Domain"]
+            AuthINFRA["Infrastructure"]
+        end
 
-        APP["Application/<br/>Use Cases<br/>Interfaces<br/>Commands / Queries"]
+        subgraph ACCOUNTS["Accounts"]
+            AccAPI["Api"]
+            AccAPP["Application"]
+            AccDOMAIN["Domain"]
+            AccINFRA["Infrastructure<br/>Consumer + Outbox"]
+        end
 
-        DOMAIN["Domain/<br/>Entities<br/>Value Objects<br/>Domain Rules<br/>Domain Events"]
+        subgraph AUDIT["Audit"]
+            AuditAPI["Api"]
+            AuditAPP["Application"]
+            AuditDOMAIN["Domain"]
+            AuditINFRA["Infrastructure<br/>Event Consumer"]
+        end
 
-        INFRA["Infrastructure/<br/>Services<br/>Repositories<br/>DbContext<br/>RabbitMQ<br/>Outbox / Inbox"]
+        MonolithDB[("PostgreSQL<br/>auth.*<br/>accounts.*<br/>audit.*<br/>outbox / inbox")]
 
-        DB[("Base de datos<br/>del módulo")]
+        AuthAPI --> AuthAPP
+        AuthAPP --> AuthDOMAIN
+        AuthINFRA --> AuthAPP
+        AuthINFRA --> AuthDOMAIN
+        AuthINFRA --> MonolithDB
 
-        API --> APP
-        APP --> DOMAIN
+        AccAPI --> AccAPP
+        AccAPP --> AccDOMAIN
+        AccINFRA --> AccAPP
+        AccINFRA --> AccDOMAIN
+        AccINFRA --> MonolithDB
 
-        INFRA --> APP
-        INFRA --> DOMAIN
-        INFRA --> DB
+        AuditAPI --> AuditAPP
+        AuditAPP --> AuditDOMAIN
+        AuditINFRA --> AuditAPP
+        AuditINFRA --> AuditDOMAIN
+        AuditINFRA --> MonolithDB
     end
 
     %% =====================================================
-    %% COMUNICACIÓN CON OTROS COMPONENTES
+    %% TRANSFERS
     %% =====================================================
 
-    subgraph EXTERNAL["Comunicación con otros módulos y servicios"]
-        direction TB
+    subgraph TRANSFERS["Transfers Service"]
+        direction LR
 
-        PUBLIC["Application Contracts/<br/>Interfaces públicas internas"]
+        TrAPI["Api"]
+        TrAPP["Application<br/>Transfer Use Cases<br/>Saga"]
+        TrDOMAIN["Domain<br/>Transfer Entity<br/>States"]
+        TrINFRA["Infrastructure<br/>DbContext<br/>Outbox / Inbox<br/>RabbitMQ Consumers"]
+        TrDB[("transfers_db")]
 
-        EVENTS["Integration Events/<br/>CloudEvents 1.0"]
-
-        BROKER[["RabbitMQ<br/>finbank.events"]]
-
-        HTTP["API Gateway / YARP<br/>Comunicación HTTP externa"]
+        TrAPI --> TrAPP
+        TrAPP --> TrDOMAIN
+        TrINFRA --> TrAPP
+        TrINFRA --> TrDOMAIN
+        TrINFRA --> TrDB
     end
 
-    %% Dentro del monolito
-    APP -.->|"Solo mediante interfaces<br/>de Application"| PUBLIC
-
-    %% Entre microservicios
-    INFRA -->|"Publica eventos<br/>mediante Outbox"| EVENTS
-    EVENTS --> BROKER
-
-    BROKER -->|"Entrega eventos"| INFRA
-
-    %% Entrada HTTP
-    HTTP --> API
-
     %% =====================================================
-    %% OBSERVABILIDAD TRANSVERSAL
+    %% NOTIFICATIONS
     %% =====================================================
 
-    subgraph OBS["Observabilidad transversal"]
-        OTEL["OpenTelemetry SDK<br/>Logs + Métricas + Trazas"]
-        COLLECTOR["OpenTelemetry Collector"]
-        BACKENDS["Tempo / Prometheus / Loki<br/>Grafana"]
+    subgraph NOTIFICATIONS["Notifications Service"]
+        direction LR
+
+        NotAPI["Api"]
+        NotAPP["Application<br/>Notification Use Cases"]
+        NotDOMAIN["Domain<br/>Notification Entity"]
+        NotINFRA["Infrastructure<br/>DbContext<br/>Inbox<br/>RabbitMQ Consumer"]
+        NotDB[("notifications_db")]
+
+        NotAPI --> NotAPP
+        NotAPP --> NotDOMAIN
+        NotINFRA --> NotAPP
+        NotINFRA --> NotDOMAIN
+        NotINFRA --> NotDB
     end
 
-    API -.-> OTEL
-    APP -.-> OTEL
-    INFRA -.-> OTEL
+    %% =====================================================
+    %% INTEGRACIÓN
+    %% =====================================================
 
-    OTEL --> COLLECTOR
-    COLLECTOR --> BACKENDS
+    Gateway["API Gateway / YARP"]
+    Rabbit[["RabbitMQ<br/>Integration Events"]]
+
+    Gateway --> AuthAPI
+    Gateway --> AccAPI
+    Gateway --> AuditAPI
+    Gateway --> TrAPI
+    Gateway --> NotAPI
+
+    TrINFRA -->|"TransferRequested.v1"| Rabbit
+    Rabbit -->|"TransferRequested.v1"| AccINFRA
+
+    AccINFRA -->|"Applied / Rejected"| Rabbit
+    Rabbit -->|"Applied / Rejected"| TrINFRA
+
+    TrINFRA -->|"Completed / Failed"| Rabbit
+    Rabbit -->|"TransferCompleted.v1"| NotINFRA
+    Rabbit -->|"Completed / Failed"| AuditINFRA
+
+    %% =====================================================
+    %% OBSERVABILIDAD
+    %% =====================================================
+
+    OTel["OpenTelemetry<br/>Logs + Métricas + Trazas"]
+
+    AuthAPI -.-> OTel
+    AccAPI -.-> OTel
+    AuditAPI -.-> OTel
+    TrAPI -.-> OTel
+    NotAPI -.-> OTel
+
+    AuthINFRA -.-> OTel
+    AccINFRA -.-> OTel
+    AuditINFRA -.-> OTel
+    TrINFRA -.-> OTel
+    NotINFRA -.-> OTel
 ```
 
 ### Aislamiento de schemas en PostgreSQL
 
 ```mermaid
-graph TD
-    subgraph PostgreSQL
-        subgraph auth
-            users[(users)]
-            refresh_tokens[(refresh_tokens)]
-        end
-        subgraph accounts
-            accounts_t[(accounts)]
-        end
-        subgraph transfers
-            transfers_t[(transfers)]
-        end
-        subgraph notifications
-            notifications_t[(notifications)]
-        end
-        subgraph audit
-            audit_entries[(audit_entries)]
-        end
+graph LR
+
+    subgraph MONOLITH_DB["postgres-monolith / modular_bank"]
+        direction TB
+
+        AUTH["auth<br/>• users<br/>• refresh_tokens"]
+
+        ACCOUNTS["accounts<br/>• accounts"]
+
+        AUDIT["audit<br/>• audit_entries"]
+
+        INTEGRATION["integración<br/>• inbox_messages<br/>• outbox_messages"]
+    end
+
+    subgraph TRANSFERS_DB["postgres-transfers / transfers_db"]
+        direction TB
+
+        TRANSFERS["transfers<br/>• transfers<br/>• outbox_messages<br/>• inbox_messages"]
+
+        TRANSFERS_MIG["public<br/>• __EFMigrationsHistory"]
+    end
+
+    subgraph NOTIFICATIONS_DB["postgres-notifications / notifications_db"]
+        direction TB
+
+        NOTIFICATIONS["notifications<br/>• notifications<br/>• inbox_messages"]
+
+        NOTIFICATIONS_MIG["public<br/>• __EFMigrationsHistory"]
     end
 ```
