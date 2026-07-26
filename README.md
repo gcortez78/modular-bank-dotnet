@@ -327,23 +327,33 @@ graph TB
 ### Aislamiento de schemas en PostgreSQL
 
 ```mermaid
-graph TD
-    subgraph PostgreSQL
-        subgraph auth
-            users[(users)]
-            refresh_tokens[(refresh_tokens)]
-        end
-        subgraph accounts
-            accounts_t[(accounts)]
-        end
-        subgraph transfers
-            transfers_t[(transfers)]
-        end
-        subgraph notifications
-            notifications_t[(notifications)]
-        end
-        subgraph audit
-            audit_entries[(audit_entries)]
-        end
+graph LR
+
+    subgraph MONOLITH_DB["postgres-monolith / modular_bank"]
+        direction TB
+
+        AUTH["auth<br/>• users<br/>• refresh_tokens"]
+
+        ACCOUNTS["accounts<br/>• accounts"]
+
+        AUDIT["audit<br/>• audit_entries"]
+
+        INTEGRATION["integración<br/>• inbox_messages<br/>• outbox_messages"]
+    end
+
+    subgraph TRANSFERS_DB["postgres-transfers / transfers_db"]
+        direction TB
+
+        TRANSFERS["transfers<br/>• transfers<br/>• outbox_messages<br/>• inbox_messages"]
+
+        TRANSFERS_MIG["public<br/>• __EFMigrationsHistory"]
+    end
+
+    subgraph NOTIFICATIONS_DB["postgres-notifications / notifications_db"]
+        direction TB
+
+        NOTIFICATIONS["notifications<br/>• notifications<br/>• inbox_messages"]
+
+        NOTIFICATIONS_MIG["public<br/>• __EFMigrationsHistory"]
     end
 ```
