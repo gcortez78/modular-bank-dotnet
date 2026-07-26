@@ -2,3 +2,25 @@ bin/
 obj/
 .env
 *.user
+*.suo
+*.log
+.vs/
+.vscode/
+TestResults/
+.adr001-backup/
+.adr001-last-backup
+
+# Respaldos locales de base de datos
+notifications-data-backup.sql
+*-data-backup.sql
+
+# Respaldos locales del instalador ADR-002
+.adr002-backup/
+
+# Práctico 4 - archivos locales
+.practico4-backup/
+.adr002-saga-backup/
+evidencias/
+*.log
+*.bak
+*.tmp

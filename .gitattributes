@@ -1,0 +1,6 @@
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+Dockerfile text eol=lf
+enabled_plugins text eol=lf

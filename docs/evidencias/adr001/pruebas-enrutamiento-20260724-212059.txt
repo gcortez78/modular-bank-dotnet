@@ -1,0 +1,8 @@
+﻿
+Route          StatusCode Result                                           
+-----          ---------- ------                                           
+/notifications        401 Error en el servidor remoto: (401) No autorizado.
+/accounts             401 Error en el servidor remoto: (401) No autorizado.
+
+
+

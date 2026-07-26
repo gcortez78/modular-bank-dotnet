@@ -1,0 +1,7 @@
+﻿NAME                             IMAGE                                       COMMAND                  SERVICE                  CREATED         STATUS                   PORTS
+finbank-gateway                  plataforma-base-finbank-gateway:1.0         "dotnet Gateway.dll"     gateway                  5 minutes ago   Up 5 minutes (healthy)   127.0.0.1:8080->8080/tcp
+finbank-monolith                 plataforma-base-finbank-monolith:1.0        "dotnet ModularBank.ÔÇª"   monolith                 5 minutes ago   Up 5 minutes (healthy)   
+finbank-notifications-service    plataforma-base-finbank-notifications:1.0   "dotnet NotificationÔÇª"   notifications-service    5 minutes ago   Up 5 minutes (healthy)   
+finbank-postgres-monolith        postgres:16-alpine                          "docker-entrypoint.sÔÇª"   postgres-monolith        6 minutes ago   Up 6 minutes (healthy)   127.0.0.1:5433->5432/tcp
+finbank-postgres-notifications   postgres:16-alpine                          "docker-entrypoint.sÔÇª"   postgres-notifications   6 minutes ago   Up 6 minutes (healthy)   127.0.0.1:5434->5432/tcp
+finbank-rabbitmq                 rabbitmq:4.3.2-management-alpine            "docker-entrypoint.sÔÇª"   rabbitmq                 6 minutes ago   Up 6 minutes (healthy)   127.0.0.1:5672->5672/tcp, 127.0.0.1:15672->15672/tcp, 127.0.0.1:15692->15692/tcp
