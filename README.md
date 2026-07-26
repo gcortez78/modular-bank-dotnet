@@ -191,24 +191,137 @@ graph TD
 ### Capas internas de cada módulo
 
 ```mermaid
-graph LR
-    subgraph módulo
-        API["Api/\n(Endpoint)"]
-        APP["Application/\n(UseCase + Interface)"]
-        INFRA["Infrastructure/\n(Service + DbContext)"]
-        DOMAIN["Domain/\n(Entity)"]
+graph TB
+
+    %% =====================================================
+    %% MONOLITO REMANENTE
+    %% =====================================================
+
+    subgraph MONOLITH["Monolito remanente"]
+        direction LR
+
+        subgraph AUTH["Auth"]
+            AuthAPI["Api"]
+            AuthAPP["Application"]
+            AuthDOMAIN["Domain"]
+            AuthINFRA["Infrastructure"]
+        end
+
+        subgraph ACCOUNTS["Accounts"]
+            AccAPI["Api"]
+            AccAPP["Application"]
+            AccDOMAIN["Domain"]
+            AccINFRA["Infrastructure<br/>Consumer + Outbox"]
+        end
+
+        subgraph AUDIT["Audit"]
+            AuditAPI["Api"]
+            AuditAPP["Application"]
+            AuditDOMAIN["Domain"]
+            AuditINFRA["Infrastructure<br/>Event Consumer"]
+        end
+
+        MonolithDB[("PostgreSQL<br/>auth.*<br/>accounts.*<br/>audit.*<br/>outbox / inbox")]
+
+        AuthAPI --> AuthAPP
+        AuthAPP --> AuthDOMAIN
+        AuthINFRA --> AuthAPP
+        AuthINFRA --> AuthDOMAIN
+        AuthINFRA --> MonolithDB
+
+        AccAPI --> AccAPP
+        AccAPP --> AccDOMAIN
+        AccINFRA --> AccAPP
+        AccINFRA --> AccDOMAIN
+        AccINFRA --> MonolithDB
+
+        AuditAPI --> AuditAPP
+        AuditAPP --> AuditDOMAIN
+        AuditINFRA --> AuditAPP
+        AuditINFRA --> AuditDOMAIN
+        AuditINFRA --> MonolithDB
     end
 
-    API --> APP
-    APP --> DOMAIN
-    INFRA --> APP
-    INFRA --> DOMAIN
+    %% =====================================================
+    %% TRANSFERS
+    %% =====================================================
 
-    subgraph "otros módulos"
-        EXT["Application/\n(Interface pública)"]
+    subgraph TRANSFERS["Transfers Service"]
+        direction LR
+
+        TrAPI["Api"]
+        TrAPP["Application<br/>Transfer Use Cases<br/>Saga"]
+        TrDOMAIN["Domain<br/>Transfer Entity<br/>States"]
+        TrINFRA["Infrastructure<br/>DbContext<br/>Outbox / Inbox<br/>RabbitMQ Consumers"]
+        TrDB[("transfers_db")]
+
+        TrAPI --> TrAPP
+        TrAPP --> TrDOMAIN
+        TrINFRA --> TrAPP
+        TrINFRA --> TrDOMAIN
+        TrINFRA --> TrDB
     end
 
-    APP -.->|"solo a través\nde interfaces"| EXT
+    %% =====================================================
+    %% NOTIFICATIONS
+    %% =====================================================
+
+    subgraph NOTIFICATIONS["Notifications Service"]
+        direction LR
+
+        NotAPI["Api"]
+        NotAPP["Application<br/>Notification Use Cases"]
+        NotDOMAIN["Domain<br/>Notification Entity"]
+        NotINFRA["Infrastructure<br/>DbContext<br/>Inbox<br/>RabbitMQ Consumer"]
+        NotDB[("notifications_db")]
+
+        NotAPI --> NotAPP
+        NotAPP --> NotDOMAIN
+        NotINFRA --> NotAPP
+        NotINFRA --> NotDOMAIN
+        NotINFRA --> NotDB
+    end
+
+    %% =====================================================
+    %% INTEGRACIÓN
+    %% =====================================================
+
+    Gateway["API Gateway / YARP"]
+    Rabbit[["RabbitMQ<br/>Integration Events"]]
+
+    Gateway --> AuthAPI
+    Gateway --> AccAPI
+    Gateway --> AuditAPI
+    Gateway --> TrAPI
+    Gateway --> NotAPI
+
+    TrINFRA -->|"TransferRequested.v1"| Rabbit
+    Rabbit -->|"TransferRequested.v1"| AccINFRA
+
+    AccINFRA -->|"Applied / Rejected"| Rabbit
+    Rabbit -->|"Applied / Rejected"| TrINFRA
+
+    TrINFRA -->|"Completed / Failed"| Rabbit
+    Rabbit -->|"TransferCompleted.v1"| NotINFRA
+    Rabbit -->|"Completed / Failed"| AuditINFRA
+
+    %% =====================================================
+    %% OBSERVABILIDAD
+    %% =====================================================
+
+    OTel["OpenTelemetry<br/>Logs + Métricas + Trazas"]
+
+    AuthAPI -.-> OTel
+    AccAPI -.-> OTel
+    AuditAPI -.-> OTel
+    TrAPI -.-> OTel
+    NotAPI -.-> OTel
+
+    AuthINFRA -.-> OTel
+    AccINFRA -.-> OTel
+    AuditINFRA -.-> OTel
+    TrINFRA -.-> OTel
+    NotINFRA -.-> OTel
 ```
 
 ### Aislamiento de schemas en PostgreSQL
